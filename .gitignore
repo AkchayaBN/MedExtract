@@ -1,0 +1,20 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Uploaded prescription images
+static/uploads/
+
+# Large datasets
+datasets/handwriting/
+datasets/ndc/drug-ndc-0001-of-0001.json
+datasets/ndc/drug-ndc-0001-of-0001.json.zip
+datasets/ndc/drug-ndc-0001-of-0001.json.zip
+
+# Tesseract training files
+tesstrain/
+tesstrain-before-training-fix/
+
+# Tesseract generated training files
+*.lstmf

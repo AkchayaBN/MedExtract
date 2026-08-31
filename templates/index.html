@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>PrescriptionRx</title>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            background: #f4f7fb;
+            color: #1f2937;
+        }
+
+        .header {
+            background: #173b6c;
+            color: white;
+            padding: 22px 40px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 30px;
+        }
+
+        .header p {
+            margin: 6px 0 0;
+            opacity: 0.9;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 35px auto;
+            padding: 0 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        }
+
+        .card h2 {
+            margin-top: 0;
+            color: #173b6c;
+        }
+
+        .upload-area {
+            border: 2px dashed #9ca3af;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+        }
+
+        input[type="file"] {
+            margin: 20px 0;
+        }
+
+        button {
+            background: #173b6c;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 7px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        .message {
+            margin-top: 20px;
+            padding: 14px;
+            background: #e8f5e9;
+            border-radius: 7px;
+        }
+
+        .error {
+            margin-top: 20px;
+            padding: 14px;
+            background: #ffebee;
+            color: #b71c1c;
+            border-radius: 7px;
+        }
+
+        .preview {
+            text-align: center;
+        }
+
+        .preview img {
+            max-width: 100%;
+            max-height: 500px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+
+        .result-box {
+            background: #f8fafc;
+            padding: 22px;
+            border-radius: 8px;
+        }
+
+        .result-row {
+            margin: 10px 0;
+        }
+
+        .result-row strong {
+            display: inline-block;
+            width: 150px;
+        }
+
+        .confidence {
+            font-size: 22px;
+            font-weight: bold;
+        }
+
+        .high {
+            color: #15803d;
+        }
+
+        .review {
+            color: #ca8a04;
+        }
+
+        .low {
+            color: #dc2626;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-weight: bold;
+            background: #e5e7eb;
+        }
+
+        .candidate {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 10px;
+        }
+
+        .candidate-number {
+            font-weight: bold;
+            color: #173b6c;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 25px;
+            color: #6b7280;
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+    <div class="header">
+
+        <h1>PrescriptionRx</h1>
+
+        <p>
+            Handwritten Prescription Analysis & Drug Matching System
+        </p>
+
+    </div>
+
+
+    <div class="container">
+
+
+        <!-- UPLOAD -->
+
+        <div class="card">
+
+            <h2>Upload Prescription</h2>
+
+            <div class="upload-area">
+
+                <p>
+                    Upload a handwritten prescription image
+                    for OCR and medicine identification.
+                </p>
+
+                <form method="POST"
+                      enctype="multipart/form-data">
+
+                    <input
+                        type="file"
+                        name="prescription"
+                        accept=".png,.jpg,.jpeg"
+                        required
+                    >
+
+                    <br>
+
+                    <button type="submit">
+                        Analyze Prescription
+                    </button>
+
+                </form>
+
+            </div>
+
+
+            {% if message %}
+
+            <div class="message">
+                {{ message }}
+            </div>
+
+            {% endif %}
+
+
+            {% if error %}
+
+            <div class="error">
+                {{ error }}
+            </div>
+
+            {% endif %}
+
+        </div>
+
+
+
+        <!-- IMAGE -->
+
+        {% if image_path %}
+
+        <div class="card preview">
+
+            <h2>Prescription Preview</h2>
+
+            <img src="{{ image_path }}"
+                 alt="Uploaded Prescription">
+
+        </div>
+
+        {% endif %}
+
+
+
+        <!-- OCR RESULT -->
+
+        {% if ocr_text %}
+
+        <div class="card">
+
+            <h2>OCR Result</h2>
+
+            <div class="result-box">
+
+                <div class="result-row">
+
+                    <strong>Recognized Text:</strong>
+
+                    {{ ocr_text }}
+
+                </div>
+
+            </div>
+
+        </div>
+
+        {% endif %}
+
+
+
+        <!-- BEST MATCH -->
+
+        {% if best_match %}
+
+        <div class="card">
+
+            <h2>Best Medicine Match</h2>
+
+            <div class="result-box">
+
+                <div class="result-row">
+                    <strong>Medicine:</strong>
+                    {{ best_match.drug_name }}
+                </div>
+
+                <div class="result-row">
+                    <strong>Generic:</strong>
+                    {{ best_match.generic_name }}
+                </div>
+
+                <div class="result-row">
+                    <strong>Dosage Form:</strong>
+                    {{ best_match.dosage_form }}
+                </div>
+
+                <div class="result-row">
+                    <strong>NDC:</strong>
+                    {{ best_match.ndc_code }}
+                </div>
+
+                <div class="result-row">
+
+                    <strong>Confidence:</strong>
+
+                    <span class="confidence
+                    {% if best_match.status == 'HIGH' %}
+                        high
+                    {% elif best_match.status == 'REVIEW' %}
+                        review
+                    {% else %}
+                        low
+                    {% endif %}
+                    ">
+
+                        {{ "%.2f"|format(best_match.confidence * 100) }}%
+
+                    </span>
+
+                </div>
+
+                <div class="result-row">
+
+                    <strong>Status:</strong>
+
+                    <span class="status">
+
+                        {{ best_match.status }}
+
+                    </span>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        {% endif %}
+
+
+
+        <!-- TOP CANDIDATES -->
+
+        {% if matches %}
+
+        <div class="card">
+
+            <h2>Top Medicine Candidates</h2>
+
+            {% for match in matches %}
+
+            <div class="candidate">
+
+                <span class="candidate-number">
+                    #{{ loop.index }}
+                </span>
+
+                <strong>
+                    {{ match.drug_name }}
+                </strong>
+
+                <br>
+
+                Generic:
+                {{ match.generic_name }}
+
+                <br>
+
+                Dosage:
+                {{ match.dosage_form }}
+
+                <br>
+
+                NDC:
+                {{ match.ndc_code }}
+
+                <br>
+
+                Confidence:
+                {{ "%.2f"|format(match.confidence * 100) }}%
+
+                &nbsp; | &nbsp;
+
+                Status:
+                {{ match.status }}
+
+            </div>
+
+            {% endfor %}
+
+        </div>
+
+        {% endif %}
+
+
+    </div>
+
+
+    <div class="footer">
+
+        PrescriptionRx — Medical Prescription OCR & Drug Verification
+
+    </div>
+
+
+</body>
+
+</html>
