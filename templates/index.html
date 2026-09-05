@@ -1,17 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <meta name="viewport"
-          content="width=device-width, initial-scale=1.0">
-
-    <title>PrescriptionRx</title>
+    <title>MedExtract - Medical Report Analysis</title>
 
     <style>
-
         * {
             box-sizing: border-box;
         }
@@ -20,407 +15,915 @@
             margin: 0;
             font-family: Arial, Helvetica, sans-serif;
             background: #f4f7fb;
-            color: #1f2937;
+            color: #26364a;
         }
 
         .header {
-            background: #173b6c;
+            background: #173f73;
             color: white;
-            padding: 22px 40px;
+            padding: 24px 20px;
+            text-align: center;
         }
 
         .header h1 {
             margin: 0;
             font-size: 30px;
+            font-weight: 700;
         }
 
         .header p {
-            margin: 6px 0 0;
+            margin: 8px 0 0;
+            font-size: 15px;
             opacity: 0.9;
         }
 
         .container {
+            width: 92%;
             max-width: 1100px;
-            margin: 35px auto;
-            padding: 0 20px;
+            margin: 30px auto;
         }
 
         .card {
             background: white;
             border-radius: 12px;
-            padding: 30px;
-            margin-bottom: 25px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            padding: 22px;
+            margin-bottom: 22px;
+            box-shadow: 0 3px 14px rgba(0, 0, 0, 0.08);
         }
 
-        .card h2 {
-            margin-top: 0;
-            color: #173b6c;
+        .card-title {
+            margin: 0 0 18px;
+            color: #174a83;
+            font-size: 19px;
+        }
+
+        /* Upload */
+
+        .upload-card {
+            text-align: center;
         }
 
         .upload-area {
-            border: 2px dashed #9ca3af;
+            border: 2px dashed #9db4cf;
             border-radius: 10px;
-            padding: 40px;
-            text-align: center;
+            padding: 30px 20px;
+            background: #f8fbff;
         }
 
-        input[type="file"] {
-            margin: 20px 0;
+        .upload-area input[type="file"] {
+            margin: 15px 0;
+            padding: 10px;
+            width: 100%;
+            max-width: 500px;
         }
 
-        button {
-            background: #173b6c;
-            color: white;
+        .analyze-btn {
+            display: inline-block;
             border: none;
-            padding: 12px 25px;
-            border-radius: 7px;
+            background: #174a83;
+            color: white;
+            padding: 12px 28px;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: 600;
             cursor: pointer;
-            font-size: 16px;
         }
 
-        button:hover {
-            opacity: 0.9;
+        .analyze-btn:hover {
+            background: #123b69;
         }
 
-        .message {
-            margin-top: 20px;
-            padding: 14px;
-            background: #e8f5e9;
-            border-radius: 7px;
+        /* Messages */
+
+        .success {
+            background: #e9f7ec;
+            color: #246b35;
+            border-radius: 6px;
+            padding: 12px 15px;
+            margin-bottom: 20px;
         }
 
         .error {
-            margin-top: 20px;
-            padding: 14px;
-            background: #ffebee;
-            color: #b71c1c;
-            border-radius: 7px;
+            background: #fdecec;
+            color: #9b2929;
+            border-radius: 6px;
+            padding: 12px 15px;
+            margin-bottom: 20px;
         }
 
-        .preview {
-            text-align: center;
-        }
+        /* Metadata */
 
-        .preview img {
-            max-width: 100%;
-            max-height: 500px;
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0;
+            border: 1px solid #e1e7ef;
             border-radius: 8px;
-            border: 1px solid #ddd;
+            overflow: hidden;
         }
 
-        .result-box {
+        .info-item {
+            padding: 13px 15px;
+            border-bottom: 1px solid #e1e7ef;
+            background: #fff;
+        }
+
+        .info-item:nth-child(odd) {
+            border-right: 1px solid #e1e7ef;
+        }
+
+        .info-label {
+            font-size: 12px;
+            color: #708198;
+            margin-bottom: 5px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .info-value {
+            font-size: 15px;
+            color: #26364a;
+            word-break: break-word;
+        }
+
+        /* Tables */
+
+        .table-wrapper {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            text-align: left;
+            background: #edf3f9;
+            color: #315a83;
+            font-size: 13px;
+            padding: 12px;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e0e6ee;
+            font-size: 14px;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Findings */
+
+        .finding-list {
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .finding-list li {
+            margin-bottom: 10px;
+            line-height: 1.55;
+            background: #f7f9fc;
+            padding: 10px 12px;
+            border-radius: 6px;
+        }
+
+        /* Impression */
+
+        .highlight-box {
+            background: #f3f7fc;
+            border-left: 4px solid #174a83;
+            padding: 15px 17px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            line-height: 1.55;
+        }
+
+        /* Empty state */
+
+        .empty {
+            color: #7b899b;
+            font-style: italic;
+        }
+
+        /* Original text */
+
+        details {
+            border: 1px solid #e1e7ef;
+            border-radius: 8px;
             background: #f8fafc;
-            padding: 22px;
-            border-radius: 8px;
         }
 
-        .result-row {
-            margin: 10px 0;
+        summary {
+            cursor: pointer;
+            padding: 14px 16px;
+            color: #174a83;
+            font-weight: 600;
         }
 
-        .result-row strong {
-            display: inline-block;
-            width: 150px;
+        .raw-text {
+            padding: 18px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: "Courier New", monospace;
+            font-size: 13px;
+            line-height: 1.55;
+            color: #36485d;
+            border-top: 1px solid #e1e7ef;
+            max-height: 600px;
+            overflow-y: auto;
         }
 
-        .confidence {
-            font-size: 22px;
-            font-weight: bold;
-        }
-
-        .high {
-            color: #15803d;
-        }
-
-        .review {
-            color: #ca8a04;
-        }
-
-        .low {
-            color: #dc2626;
-        }
-
-        .status {
-            display: inline-block;
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-weight: bold;
-            background: #e5e7eb;
-        }
-
-        .candidate {
-            background: white;
-            border: 1px solid #e5e7eb;
-            border-radius: 8px;
-            padding: 15px;
-            margin-top: 10px;
-        }
-
-        .candidate-number {
-            font-weight: bold;
-            color: #173b6c;
-        }
+        /* Footer */
 
         .footer {
             text-align: center;
-            padding: 25px;
-            color: #6b7280;
+            padding: 25px 15px;
+            color: #718096;
+            font-size: 13px;
         }
 
+        /* Loading */
+
+        .loading {
+            display: none;
+            margin-top: 15px;
+            color: #174a83;
+            font-size: 14px;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 15px;
+            height: 15px;
+            border: 2px solid #c7d5e5;
+            border-top-color: #174a83;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            vertical-align: middle;
+            margin-right: 7px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Responsive */
+
+        @media (max-width: 700px) {
+
+            .container {
+                width: 95%;
+                margin-top: 18px;
+            }
+
+            .header h1 {
+                font-size: 24px;
+            }
+
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .info-item:nth-child(odd) {
+                border-right: none;
+            }
+
+            .card {
+                padding: 17px;
+            }
+        }
     </style>
-
 </head>
-
 
 <body>
 
-    <div class="header">
+    <!-- =====================================================
+         HEADER
+    ====================================================== -->
 
-        <h1>PrescriptionRx</h1>
+    <header class="header">
+
+        <h1>MedExtract</h1>
 
         <p>
-            Handwritten Prescription Analysis & Drug Matching System
+            Medical Report Analysis &amp; Information Extraction System
         </p>
 
-    </div>
+    </header>
 
 
-    <div class="container">
+    <!-- =====================================================
+         MAIN
+    ====================================================== -->
+
+    <main class="container">
 
 
-        <!-- UPLOAD -->
+        <!-- =================================================
+             UPLOAD
+        ================================================== -->
 
-        <div class="card">
+        <section class="card upload-card">
 
-            <h2>Upload Prescription</h2>
+            <h2 class="card-title">
+                Upload Medical Report
+            </h2>
 
             <div class="upload-area">
 
                 <p>
-                    Upload a handwritten prescription image
-                    for OCR and medicine identification.
+                    Upload a thyroid ultrasound medical report in PDF format.
                 </p>
 
-                <form method="POST"
-                      enctype="multipart/form-data">
+                <form
+                    method="POST"
+                    enctype="multipart/form-data"
+                    onsubmit="showLoading()"
+                >
 
                     <input
                         type="file"
-                        name="prescription"
-                        accept=".png,.jpg,.jpeg"
+                        name="report"
+                        accept=".pdf,application/pdf"
                         required
                     >
 
                     <br>
 
-                    <button type="submit">
-                        Analyze Prescription
+                    <button
+                        type="submit"
+                        class="analyze-btn"
+                    >
+                        Analyze Medical Report
                     </button>
+
+                    <div
+                        id="loading"
+                        class="loading"
+                    >
+                        <span class="spinner"></span>
+                        Analyzing report. Please wait...
+                    </div>
 
                 </form>
 
             </div>
 
+        </section>
 
-            {% if message %}
 
-            <div class="message">
-                {{ message }}
-            </div>
+        <!-- =================================================
+             MESSAGE
+        ================================================== -->
 
+        {% if message %}
+
+        <div class="success">
+            {{ message }}
+
+            {% if extraction_method %}
+                <br>
+                <small>
+                    Extraction method:
+                    <strong>{{ extraction_method }}</strong>
+                </small>
             {% endif %}
-
-
-            {% if error %}
-
-            <div class="error">
-                {{ error }}
-            </div>
-
-            {% endif %}
-
-        </div>
-
-
-
-        <!-- IMAGE -->
-
-        {% if image_path %}
-
-        <div class="card preview">
-
-            <h2>Prescription Preview</h2>
-
-            <img src="{{ image_path }}"
-                 alt="Uploaded Prescription">
-
         </div>
 
         {% endif %}
 
 
+        <!-- =================================================
+             ERROR
+        ================================================== -->
 
-        <!-- OCR RESULT -->
+        {% if error %}
 
-        {% if ocr_text %}
-
-        <div class="card">
-
-            <h2>OCR Result</h2>
-
-            <div class="result-box">
-
-                <div class="result-row">
-
-                    <strong>Recognized Text:</strong>
-
-                    {{ ocr_text }}
-
-                </div>
-
-            </div>
-
+        <div class="error">
+            {{ error }}
         </div>
 
         {% endif %}
 
 
+        {% if report_data %}
 
-        <!-- BEST MATCH -->
 
-        {% if best_match %}
+        <!-- =================================================
+             PATIENT INFORMATION
+        ================================================== -->
 
-        <div class="card">
+        <section class="card">
 
-            <h2>Best Medicine Match</h2>
+            <h2 class="card-title">
+                Patient &amp; Report Information
+            </h2>
 
-            <div class="result-box">
+            <div class="info-grid">
 
-                <div class="result-row">
-                    <strong>Medicine:</strong>
-                    {{ best_match.drug_name }}
-                </div>
+                {% if report_data.metadata.patient_name %}
 
-                <div class="result-row">
-                    <strong>Generic:</strong>
-                    {{ best_match.generic_name }}
-                </div>
+                <div class="info-item">
 
-                <div class="result-row">
-                    <strong>Dosage Form:</strong>
-                    {{ best_match.dosage_form }}
-                </div>
+                    <div class="info-label">
+                        Patient Name
+                    </div>
 
-                <div class="result-row">
-                    <strong>NDC:</strong>
-                    {{ best_match.ndc_code }}
-                </div>
-
-                <div class="result-row">
-
-                    <strong>Confidence:</strong>
-
-                    <span class="confidence
-                    {% if best_match.status == 'HIGH' %}
-                        high
-                    {% elif best_match.status == 'REVIEW' %}
-                        review
-                    {% else %}
-                        low
-                    {% endif %}
-                    ">
-
-                        {{ "%.2f"|format(best_match.confidence * 100) }}%
-
-                    </span>
+                    <div class="info-value">
+                        {{ report_data.metadata.patient_name }}
+                    </div>
 
                 </div>
 
-                <div class="result-row">
+                {% endif %}
 
-                    <strong>Status:</strong>
 
-                    <span class="status">
+                {% if report_data.metadata.mrn %}
 
-                        {{ best_match.status }}
+                <div class="info-item">
 
-                    </span>
+                    <div class="info-label">
+                        MRN / Patient ID
+                    </div>
+
+                    <div class="info-value">
+                        {{ report_data.metadata.mrn }}
+                    </div>
 
                 </div>
+
+                {% endif %}
+
+
+                {% if report_data.metadata.age_gender %}
+
+                <div class="info-item">
+
+                    <div class="info-label">
+                        Age / Gender
+                    </div>
+
+                    <div class="info-value">
+                        {{ report_data.metadata.age_gender }}
+                    </div>
+
+                </div>
+
+                {% endif %}
+
+
+                {% if report_data.metadata.requested_by %}
+
+                <div class="info-item">
+
+                    <div class="info-label">
+                        Referring Physician / Requested By
+                    </div>
+
+                    <div class="info-value">
+                        {{ report_data.metadata.requested_by }}
+                    </div>
+
+                </div>
+
+                {% endif %}
+
+
+                {% if report_data.metadata.procedure_date %}
+
+                <div class="info-item">
+
+                    <div class="info-label">
+                        Procedure / Study Date
+                    </div>
+
+                    <div class="info-value">
+                        {{ report_data.metadata.procedure_date }}
+                    </div>
+
+                </div>
+
+                {% endif %}
+
+
+                {% if report_data.metadata.study_datetime %}
+
+                <div class="info-item">
+
+                    <div class="info-label">
+                        Study Date &amp; Time
+                    </div>
+
+                    <div class="info-value">
+                        {{ report_data.metadata.study_datetime }}
+                    </div>
+
+                </div>
+
+                {% endif %}
+
+
+                {% if report_data.metadata.reported_datetime %}
+
+                <div class="info-item">
+
+                    <div class="info-label">
+                        Reported Date &amp; Time
+                    </div>
+
+                    <div class="info-value">
+                        {{ report_data.metadata.reported_datetime }}
+                    </div>
+
+                </div>
+
+                {% endif %}
+
+
+                {% if report_data.metadata.facility %}
+
+                <div class="info-item">
+
+                    <div class="info-label">
+                        Facility
+                    </div>
+
+                    <div class="info-value">
+                        {{ report_data.metadata.facility }}
+                    </div>
+
+                </div>
+
+                {% endif %}
 
             </div>
 
-        </div>
+        </section>
+
+
+        <!-- =================================================
+             EXAMINATION
+        ================================================== -->
+
+        {% if report_data.examination %}
+
+        <section class="card">
+
+            <h2 class="card-title">
+                Examination
+            </h2>
+
+            <div class="highlight-box">
+                {{ report_data.examination }}
+            </div>
+
+        </section>
 
         {% endif %}
 
 
+        <!-- =================================================
+             CLINICAL INDICATION
+        ================================================== -->
 
-        <!-- TOP CANDIDATES -->
+        {% if report_data.indication %}
 
-        {% if matches %}
+        <section class="card">
 
-        <div class="card">
+            <h2 class="card-title">
+                Clinical Indication
+            </h2>
 
-            <h2>Top Medicine Candidates</h2>
+            <div class="highlight-box">
+                {{ report_data.indication }}
+            </div>
 
-            {% for match in matches %}
+        </section>
 
-            <div class="candidate">
+        {% endif %}
 
-                <span class="candidate-number">
-                    #{{ loop.index }}
-                </span>
 
-                <strong>
-                    {{ match.drug_name }}
-                </strong>
+        <!-- =================================================
+             THYROID MEASUREMENTS
+        ================================================== -->
 
-                <br>
+        {% if report_data.measurements %}
 
-                Generic:
-                {{ match.generic_name }}
+        <section class="card">
 
-                <br>
+            <h2 class="card-title">
+                Thyroid Measurements
+            </h2>
 
-                Dosage:
-                {{ match.dosage_form }}
+            <div class="table-wrapper">
 
-                <br>
+                <table>
 
-                NDC:
-                {{ match.ndc_code }}
+                    <thead>
 
-                <br>
+                        <tr>
 
-                Confidence:
-                {{ "%.2f"|format(match.confidence * 100) }}%
+                            <th>
+                                Structure
+                            </th>
 
-                &nbsp; | &nbsp;
+                            <th>
+                                Size
+                            </th>
 
-                Status:
-                {{ match.status }}
+                            <th>
+                                Volume
+                            </th>
 
+                        </tr>
+
+                    </thead>
+
+                    <tbody>
+
+                        {% for measurement in report_data.measurements %}
+
+                        <tr>
+
+                            <td>
+                                <strong>
+                                    {{ measurement.name }}
+                                </strong>
+                            </td>
+
+                            <td>
+                                {% if measurement.size %}
+                                    {{ measurement.size }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {% if measurement.volume %}
+                                    {{ measurement.volume }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+
+                        </tr>
+
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </section>
+
+        {% endif %}
+
+
+        <!-- =================================================
+             FINDINGS
+        ================================================== -->
+
+        {% if report_data.findings %}
+
+        <section class="card">
+
+            <h2 class="card-title">
+                Findings
+            </h2>
+
+            <ul class="finding-list">
+
+                {% for item in report_data.findings %}
+
+                <li>
+                    {{ item }}
+                </li>
+
+                {% endfor %}
+
+            </ul>
+
+        </section>
+
+        {% endif %}
+
+
+        <!-- =================================================
+             NODULES
+        ================================================== -->
+
+        {% if report_data.nodules %}
+
+        <section class="card">
+
+            <h2 class="card-title">
+                Thyroid Nodules
+            </h2>
+
+            <div class="table-wrapper">
+
+                <table>
+
+                    <thead>
+
+                        <tr>
+
+                            <th>
+                                Location
+                            </th>
+
+                            <th>
+                                Size
+                            </th>
+
+                            <th>
+                                Description
+                            </th>
+
+                            <th>
+                                TI-RADS
+                            </th>
+
+                        </tr>
+
+                    </thead>
+
+                    <tbody>
+
+                        {% for nodule in report_data.nodules %}
+
+                        <tr>
+
+                            <td>
+                                {% if nodule.location %}
+                                    {{ nodule.location }} lobe
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {% if nodule.size %}
+                                    {{ nodule.size }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {{ nodule.description }}
+                            </td>
+
+                            <td>
+                                {% if nodule.tirads %}
+                                    <strong>
+                                        {{ nodule.tirads }}
+                                    </strong>
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+
+                        </tr>
+
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </section>
+
+        {% endif %}
+
+
+        <!-- =================================================
+             IMPRESSION / CONCLUSION / OPINION
+        ================================================== -->
+
+        {% if report_data.impression %}
+
+        <section class="card">
+
+            <h2 class="card-title">
+                Impression / Conclusion
+            </h2>
+
+            {% for item in report_data.impression %}
+
+            <div class="highlight-box">
+                {{ item }}
             </div>
 
             {% endfor %}
 
-        </div>
+        </section>
 
         {% endif %}
 
 
-    </div>
+        <!-- =================================================
+             RECOMMENDATIONS
+        ================================================== -->
+
+        {% if report_data.recommendations %}
+
+        <section class="card">
+
+            <h2 class="card-title">
+                Recommendation / Follow-up
+            </h2>
+
+            <ul class="finding-list">
+
+                {% for item in report_data.recommendations %}
+
+                <li>
+                    {{ item }}
+                </li>
+
+                {% endfor %}
+
+            </ul>
+
+        </section>
+
+        {% endif %}
 
 
-    <div class="footer">
+        <!-- =================================================
+             ORIGINAL EXTRACTED TEXT
+        ================================================== -->
 
-        PrescriptionRx — Medical Prescription OCR & Drug Verification
+        {% if extracted_text %}
 
-    </div>
+        <section class="card">
 
+            <h2 class="card-title">
+                Original Extracted Text
+            </h2>
+
+            <details>
+
+                <summary>
+                    View extracted PDF / OCR text
+                </summary>
+
+                <div class="raw-text">{{ extracted_text }}</div>
+
+            </details>
+
+        </section>
+
+        {% endif %}
+
+
+        {% endif %}
+
+
+    </main>
+
+
+    <!-- =====================================================
+         FOOTER
+    ====================================================== -->
+
+    <footer class="footer">
+
+        MedExtract &mdash;
+        Medical Report Analysis &amp; Information Extraction
+
+    </footer>
+
+
+    <!-- =====================================================
+         JAVASCRIPT
+    ====================================================== -->
+
+    <script>
+
+        function showLoading() {
+
+            const loading =
+                document.getElementById("loading");
+
+            if (loading) {
+                loading.style.display = "block";
+            }
+
+        }
+
+    </script>
 
 </body>
-
 </html>
