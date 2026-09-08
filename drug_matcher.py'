@@ -19,6 +19,10 @@ HIGH_CONFIDENCE = 0.90
 REVIEW_CONFIDENCE = 0.75
 
 
+class DrugCatalogueUnavailableError(RuntimeError):
+    """Raised when the drug catalogue cannot be loaded from PostgreSQL."""
+
+
 def normalize_text(text):
     if not text:
         return ""
@@ -35,25 +39,32 @@ def normalize_text(text):
 
 
 def get_drugs():
-    conn = psycopg2.connect(**DB_CONFIG)
-
     try:
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                SELECT
-                    id,
-                    drug_name,
-                    generic_name,
-                    dosage_form,
-                    ndc_code
-                FROM drugs
-                WHERE drug_name IS NOT NULL
-            """)
+        conn = psycopg2.connect(**DB_CONFIG)
 
-            rows = cursor.fetchall()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT
+                        id,
+                        drug_name,
+                        generic_name,
+                        dosage_form,
+                        ndc_code
+                    FROM drugs
+                    WHERE drug_name IS NOT NULL
+                """)
 
-    finally:
-        conn.close()
+                rows = cursor.fetchall()
+
+        finally:
+            conn.close()
+
+    except psycopg2.Error as exc:
+        raise DrugCatalogueUnavailableError(
+            "Drug matching is unavailable because the drug database "
+            "cannot be reached. Check PostgreSQL and the DB_* settings."
+        ) from exc
 
     drugs = []
 
@@ -77,8 +88,18 @@ def get_drugs():
     return drugs
 
 
-# Load database once when the application starts.
-DRUGS = get_drugs()
+# The catalogue is loaded on the first match request, not during application
+# import. This keeps Flask startup independent from PostgreSQL availability.
+DRUGS = None
+
+
+def get_cached_drugs():
+    global DRUGS
+
+    if DRUGS is None:
+        DRUGS = get_drugs()
+
+    return DRUGS
 
 
 def calculate_score(ocr_text, drug):
@@ -135,7 +156,7 @@ def match_drug(ocr_text, limit=5):
 
     results = []
 
-    for drug in DRUGS:
+    for drug in get_cached_drugs():
 
         score = calculate_score(
             normalized_ocr,

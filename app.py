@@ -1,7 +1,10 @@
 import os
 import re
 import uuid
+import json
 import subprocess
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 import fitz
 from flask import Flask, render_template, request
@@ -125,6 +128,27 @@ def run_ocr_on_pdf(pdf_path):
         doc.close()
 
     return "\n\n".join(pages).strip()
+
+
+def should_use_ocr(extracted_text):
+    """Detect PDFs with an empty or incomplete text layer."""
+
+    if not extracted_text or len(extracted_text.strip()) < 200:
+        return True
+
+    report_markers = [
+        "FINDINGS",
+        "IMPRESSION",
+        "CONCLUSION",
+        "RECOMMENDATION",
+        "FOLLOW UP",
+        "FOLLOW-UP",
+    ]
+
+    return not any(
+        marker in extracted_text.upper()
+        for marker in report_markers
+    )
 
 
 # ============================================================
@@ -461,6 +485,9 @@ def split_findings(text):
 
     text = remove_footer(text)
 
+    # PDF bullet characters are sometimes copied as private-use glyphs.
+    text = re.sub(r"[•●▪◦·\uf0b7]", "\n", text)
+
     lines = text.split("\n")
 
     findings = []
@@ -514,10 +541,35 @@ def split_findings(text):
 
 def extract_findings(text):
 
-    findings_text = find_section(
-        text,
-        "FINDINGS"
-    )
+    findings_text = ""
+
+    for heading in [
+        "FINDINGS",
+        "OBSERVATIONS",
+        "OBSERVATION",
+        "DESCRIPTION",
+    ]:
+        findings_text = find_section(text, heading)
+
+        if findings_text:
+            break
+
+    if not findings_text:
+        # Different report systems use descriptive examination headings
+        # instead of the literal word "Findings".
+        body_heading = re.search(
+            r"(?:^|\n)\s*((?:ultrasound|sonography|usg)"
+            r"[^\n]*(?:report|examination|study|neck|thyroid|abdomen|pelvis)?)"
+            r"\s*:?\s*\n",
+            text,
+            re.IGNORECASE,
+        )
+
+        if body_heading:
+            findings_text = find_section(
+                text,
+                body_heading.group(1).strip(),
+            )
 
     if not findings_text:
 
@@ -965,7 +1017,9 @@ def index():
                         save_path
                     )
 
-                    if extracted_text.strip():
+                    if extracted_text.strip() and not should_use_ocr(
+                        extracted_text
+                    ):
 
                         extraction_method = (
                             "PDF text extraction"
@@ -1036,6 +1090,50 @@ def index():
 
         extraction_method=extraction_method,
     )
+
+
+@app.route("/translate", methods=["POST"])
+def translate():
+    payload = request.get_json(silent=True) or {}
+    texts = payload.get("texts")
+
+    if not isinstance(texts, list) or not all(
+        isinstance(text, str) for text in texts
+    ):
+        return {"error": "Translation requires a list of text values."}, 400
+
+    if len(texts) > 100 or any(len(text) > 2000 for text in texts):
+        return {"error": "The translation request is too large."}, 413
+
+    translated = []
+
+    try:
+        for text in texts:
+            query = urlencode({
+                "client": "gtx",
+                "sl": "en",
+                "tl": "ta",
+                "dt": "t",
+                "q": text,
+            })
+            request_url = "https://translate.googleapis.com/translate_a/single?" + query
+            translation_request = Request(
+                request_url,
+                headers={"User-Agent": "MedExtract/1.0"},
+            )
+
+            with urlopen(translation_request, timeout=10) as response:
+                result = json.loads(response.read().decode("utf-8"))
+
+            translated.append("".join(
+                part[0] for part in result[0] if part and part[0]
+            ))
+    except Exception:
+        return {
+            "error": "Tamil translation is temporarily unavailable."
+        }, 502
+
+    return {"translations": translated}
 
 
 # ============================================================

@@ -178,16 +178,80 @@
         /* Findings */
 
         .finding-list {
+            list-style: none;
             margin: 0;
-            padding-left: 20px;
+            padding: 0;
         }
 
         .finding-list li {
+            display: grid;
+            grid-template-columns: 32px minmax(0, 1fr);
+            gap: 12px;
+            align-items: start;
             margin-bottom: 10px;
             line-height: 1.55;
             background: #f7f9fc;
             padding: 10px 12px;
             border-radius: 6px;
+        }
+
+        .finding-list li::before {
+            content: counter(findings);
+            counter-increment: findings;
+            display: grid;
+            place-items: center;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            background: #174a83;
+            color: white;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .finding-list {
+            counter-reset: findings;
+        }
+
+        .section-heading {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .translation-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-bottom: 22px;
+        }
+
+        .translation-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .translate-btn {
+            border: 1px solid #174a83;
+            background: white;
+            color: #174a83;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .translate-btn:hover {
+            background: #edf3f9;
+        }
+
+        .translate-status {
+            color: #708198;
+            font-size: 13px;
+            margin: 10px 0 0;
         }
 
         /* Impression */
@@ -412,6 +476,20 @@
 
 
         {% if report_data %}
+
+        <div class="translation-toolbar">
+            <p id="translate-status" class="translate-status" role="status"></p>
+            <div class="translation-actions">
+                <button
+                    type="button"
+                    class="translate-btn"
+                    id="translate-button"
+                    onclick="translateOutput()"
+                >
+                    Translate to Tamil
+                </button>
+            </div>
+        </div>
 
 
         <!-- =================================================
@@ -695,15 +773,23 @@
 
         <section class="card">
 
-            <h2 class="card-title">
-                Findings
-            </h2>
+            <div class="section-heading">
+                <h2 class="card-title">Findings</h2>
+                <button
+                    type="button"
+                    class="translate-btn section-read-button"
+                    data-section="findings"
+                    onclick="readTamilAloud(this, 'findings')"
+                >
+                    Read Findings Aloud
+                </button>
+            </div>
 
-            <ul class="finding-list">
+            <ul id="findings-section" class="finding-list">
 
                 {% for item in report_data.findings %}
 
-                <li>
+                <li class="translatable" data-original="{{ item }}">
                     {{ item }}
                 </li>
 
@@ -815,17 +901,27 @@
 
         <section class="card">
 
-            <h2 class="card-title">
-                Impression / Conclusion
-            </h2>
+            <div class="section-heading">
+                <h2 class="card-title">Impression / Conclusion</h2>
+                <button
+                    type="button"
+                    class="translate-btn section-read-button"
+                    data-section="impression"
+                    onclick="readTamilAloud(this, 'impression')"
+                >
+                    Read Impression Aloud
+                </button>
+            </div>
 
+            <div id="impression-section">
             {% for item in report_data.impression %}
 
-            <div class="highlight-box">
+            <div class="highlight-box translatable" data-original="{{ item }}">
                 {{ item }}
             </div>
 
             {% endfor %}
+            </div>
 
         </section>
 
@@ -840,15 +936,23 @@
 
         <section class="card">
 
-            <h2 class="card-title">
-                Recommendation / Follow-up
-            </h2>
+            <div class="section-heading">
+                <h2 class="card-title">Recommendation / Follow-up</h2>
+                <button
+                    type="button"
+                    class="translate-btn section-read-button"
+                    data-section="recommendations"
+                    onclick="readTamilAloud(this, 'recommendations')"
+                >
+                    Read Follow-up Aloud
+                </button>
+            </div>
 
-            <ul class="finding-list">
+            <ul id="recommendations-section" class="finding-list">
 
                 {% for item in report_data.recommendations %}
 
-                <li>
+                <li class="translatable" data-original="{{ item }}">
                     {{ item }}
                 </li>
 
@@ -921,6 +1025,146 @@
                 loading.style.display = "block";
             }
 
+        }
+
+        async function translateOutput() {
+            const button = document.getElementById("translate-button");
+            const status = document.getElementById("translate-status");
+            const items = Array.from(document.querySelectorAll(".translatable"));
+            const isTamil = button.dataset.language === "ta";
+
+            if (isTamil) {
+                items.forEach((item) => {
+                    item.textContent = item.dataset.original;
+                });
+                button.dataset.language = "en";
+                button.textContent = "Translate to Tamil";
+                status.textContent = "Showing the original English output.";
+                return;
+            }
+
+            button.disabled = true;
+            status.textContent = "Translating output...";
+
+            try {
+                const response = await fetch("{{ url_for('translate') }}", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({
+                        texts: items.map((item) => item.dataset.original),
+                    }),
+                });
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || "Translation failed.");
+                }
+
+                items.forEach((item, index) => {
+                    item.textContent = result.translations[index];
+                });
+                button.dataset.language = "ta";
+                button.textContent = "Show English";
+                status.textContent = "Tamil translation shown.";
+            } catch (error) {
+                status.textContent = error.message;
+            } finally {
+                button.disabled = false;
+            }
+        }
+
+        function loadSpeechVoices() {
+            return new Promise((resolve) => {
+                const voices = window.speechSynthesis.getVoices();
+
+                if (voices.length) {
+                    resolve(voices);
+                    return;
+                }
+
+                const finish = () => {
+                    window.speechSynthesis.removeEventListener("voiceschanged", finish);
+                    resolve(window.speechSynthesis.getVoices());
+                };
+
+                window.speechSynthesis.addEventListener("voiceschanged", finish);
+                window.setTimeout(finish, 1500);
+            });
+        }
+
+        async function readTamilAloud(button, sectionName) {
+            const status = document.getElementById("translate-status");
+
+            if (!("speechSynthesis" in window)) {
+                status.textContent = "Text-to-speech is not supported in this browser.";
+                return;
+            }
+
+            if (window.speechSynthesis.speaking) {
+                window.speechSynthesis.cancel();
+                window.activeReadButton = null;
+                button.textContent = "Read " + sectionName + " Aloud";
+                status.textContent = "Reading stopped.";
+                return;
+            }
+
+            const section = document.getElementById(sectionName + "-section");
+            const items = Array.from(section.querySelectorAll(".translatable"));
+            const text = items.map((item) => item.textContent.trim()).filter(Boolean).join(". ");
+
+            if (!text) {
+                status.textContent = "There is no text in this section to read.";
+                return;
+            }
+
+            const isTamil = document.getElementById("translate-button").dataset.language === "ta";
+            const voices = await loadSpeechVoices();
+            const preferredVoice = voices.find((voice) => {
+                const language = voice.lang.toLowerCase().replace("_", "-");
+                return isTamil
+                    ? language.startsWith("ta-") || /tamil/i.test(voice.name)
+                    : language.startsWith("en-");
+            });
+
+            if (isTamil && !preferredVoice) {
+                status.textContent = "Tamil voice is not available in Chrome. Restart Chrome after installing the Tamil speech voice.";
+                return;
+            }
+
+            const chunks = text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [text];
+            let chunkIndex = 0;
+            window.activeReadButton = button;
+
+            const speakNext = () => {
+                if (window.activeReadButton !== button) {
+                    return;
+                }
+
+                if (chunkIndex >= chunks.length) {
+                    button.textContent = "Read " + sectionName + " Aloud";
+                    status.textContent = "Reading finished.";
+                    return;
+                }
+
+                const speech = new SpeechSynthesisUtterance(chunks[chunkIndex++].trim());
+                speech.lang = isTamil ? "ta-IN" : "en-US";
+                speech.rate = isTamil ? 0.85 : 0.95;
+                if (preferredVoice) {
+                    speech.voice = preferredVoice;
+                }
+                speech.onstart = () => {
+                    button.textContent = "Stop Reading";
+                    status.textContent = "Reading " + sectionName + "...";
+                };
+                speech.onend = speakNext;
+                speech.onerror = () => {
+                    button.textContent = "Read " + sectionName + " Aloud";
+                    status.textContent = "Text-to-speech is unavailable in this browser.";
+                };
+                window.speechSynthesis.speak(speech);
+            };
+
+            speakNext();
         }
 
     </script>

@@ -1,0 +1,8 @@
+# Python dependencies for the Flask application and data-preparation scripts.
+# Tesseract OCR and its language data are installed separately at the OS level.
+Flask>=3.0,<4.0
+PyMuPDF>=1.23,<2.0
+pandas>=2.0,<3.0
+psycopg2-binary>=2.9,<3.0
+python-dotenv>=1.0,<2.0
+RapidFuzz>=3.0,<4.0
