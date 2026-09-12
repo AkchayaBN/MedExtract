@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedExtract - Trend for {{ mrn }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body>
+
+    {% include "_nav.html" %}
+
+    <div class="page-head">
+        <h1>{{ patient_name or mrn }}</h1>
+        <p>MRN <span class="data">{{ mrn }}</span> &nbsp;·&nbsp; <a href="/dashboard">&larr; Back to dashboard</a></p>
+    </div>
+
+    <div class="container container-narrow">
+
+        <div class="card card-flush">
+            {% if reports|length < 2 %}
+            <div class="empty-state" style="padding-top:24px;">
+                <p>Only {{ reports|length }} report found for this patient. Upload at least 2 reports with the same MRN to see a trend.</p>
+            </div>
+            {% endif %}
+            <div class="table-wrapper">
+                <table>
+                    <tr><th>Date</th><th>Report</th><th>Risk</th><th>Nodule count</th><th>Largest nodule</th></tr>
+                    {% for row in trend_rows %}
+                    <tr>
+                        <td class="data">{{ row.procedure_date or '—' }}</td>
+                        <td><a href="/report/{{ row.id }}">#{{ row.id }}</a></td>
+                        <td><span class="badge badge-{{ row.risk_level }}">{{ row.risk_level }}</span></td>
+                        <td class="data">{{ row.nodule_count }}</td>
+                        <td class="data">
+                            {{ row.largest_nodule_size or '—' }}
+                            {% if row.change == 'up' %}<span class="change-up">&uarr; increased</span>
+                            {% elif row.change == 'down' %}<span class="change-down">&darr; decreased</span>
+                            {% elif row.change == 'same' %}<span class="change-same">no change</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+        </div>
+
+    </div>
+</body>
+</html>

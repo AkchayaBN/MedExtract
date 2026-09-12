@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedExtract - Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body>
+
+    {% include "_nav.html" %}
+
+    <div class="page-head">
+        <h1>Report history</h1>
+        <p>{{ reports|length }} report{{ 's' if reports|length != 1 else '' }}{% if query %} matching "{{ query }}"{% endif %}</p>
+    </div>
+
+    <div class="container">
+
+        <div class="card">
+            <form class="toolbar" method="get" action="/dashboard">
+                <input type="text" name="q" placeholder="Search by patient name, MRN, findings, nodules..." value="{{ query or '' }}">
+                <button type="submit" class="btn btn-sm">Search</button>
+                {% if query %}<a class="btn btn-quiet btn-sm" href="/dashboard">Clear</a>{% endif %}
+            </form>
+        </div>
+
+        <div class="card card-flush">
+            {% if reports %}
+            <div class="table-wrapper">
+                <table>
+                    <tr>
+                        <th>ID</th>
+                        <th>Patient</th>
+                        <th>MRN</th>
+                        <th>Procedure date</th>
+                        <th>Risk</th>
+                        <th>Extraction</th>
+                        <th>Uploaded</th>
+                        <th></th>
+                    </tr>
+                    {% for r in reports %}
+                    <tr class="clickable-row" onclick="window.location='/report/{{ r.id }}'">
+                        <td class="data">#{{ r.id }}</td>
+                        <td>{{ r.patient_name or '—' }}</td>
+                        <td class="data">
+                            {% if r.mrn %}
+                            <a class="data" href="/trend/{{ r.mrn }}" onclick="event.stopPropagation()">{{ r.mrn }}</a>
+                            {% else %}—{% endif %}
+                        </td>
+                        <td class="data">{{ r.procedure_date or '—' }}</td>
+                        <td><span class="badge badge-{{ r.risk_level }}{{ ' pulse' if r.risk_level == 'HIGH' else '' }}">{{ r.risk_level }}</span></td>
+                        <td>
+                            {{ r.extraction_method or '—' }}
+                            {% if r.ocr_confidence is not none %}
+                                <br><span class="data" style="font-size:12px; color:var(--ink-faint);">{{ r.ocr_confidence }}% conf.</span>
+                            {% endif %}
+                        </td>
+                        <td class="data" style="font-size:12.5px; color:var(--ink-faint);">{{ r.created_at[:19] if r.created_at else '' }}</td>
+                        <td>
+                            <a class="btn btn-quiet btn-sm" href="/report/{{ r.id }}" onclick="event.stopPropagation()">View</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <svg class="icon" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin:0 auto;"><path d="M14 3v5a1 1 0 0 0 1 1h5"/><path d="M6 3h9l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/></svg>
+                <p>No reports found.{% if not query %} Upload one from the <a href="/">upload page</a>.{% endif %}</p>
+            </div>
+            {% endif %}
+        </div>
+
+    </div>
+</body>
+</html>

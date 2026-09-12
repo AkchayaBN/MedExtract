@@ -1,0 +1,25 @@
+<header class="topbar">
+    <div class="topbar-inner">
+        <a class="wordmark" href="/">
+            <span class="wordmark-mark">Rx</span>
+            <span class="wordmark-text">MedExtract</span>
+            <span class="wordmark-tagline">report extraction &amp; analysis</span>
+        </a>
+        <nav class="topnav" id="topnav">
+            <a href="/">Upload</a>
+            <a href="/dashboard">Dashboard</a>
+            <a href="/chat">Ask all reports</a>
+        </nav>
+    </div>
+</header>
+<script>
+    (function () {
+        var here = window.location.pathname;
+        document.querySelectorAll("#topnav a").forEach(function (link) {
+            var target = link.getAttribute("href");
+            if (target === "/" ? here === "/" : here.indexOf(target) === 0) {
+                link.classList.add("current");
+            }
+        });
+    })();
+</script>

@@ -1,17 +1,26 @@
 import os
 import re
-import uuid
 import json
-import subprocess
-from urllib.parse import urlencode
-from urllib.request import Request, urlopen
+import uuid
 
 import fitz
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, send_file, jsonify, Response
 from werkzeug.utils import secure_filename
+
+import database
+import risk_analyzer
+import export_utils
+import chatbot
+import recommendation_engine
+import thyroid_diagram
+import followup_scheduler
+import global_chatbot
+import key_points
+import ocr_engine
 
 
 app = Flask(__name__)
+database.init_db()
 
 UPLOAD_FOLDER = os.path.join("static", "uploads")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -59,101 +68,40 @@ def extract_pdf_text(pdf_path):
 
 
 # ============================================================
-# OCR FALLBACK
+# OCR FALLBACK - see ocr_engine.py for the actual pytesseract-based
+# implementation (with preprocessing, PSM fallback, and confidence
+# scoring). This project now uses that instead of shelling out to
+# the tesseract CLI directly.
 # ============================================================
-
-def run_ocr_on_pdf(pdf_path):
-    """
-    Render PDF pages to images and run Tesseract.
-    Used only when the PDF has no usable text layer.
-    """
-
-    doc = fitz.open(pdf_path)
-    pages = []
-
-    try:
-        for page_number, page in enumerate(doc):
-
-            pix = page.get_pixmap(
-                matrix=fitz.Matrix(2, 2),
-                alpha=False
-            )
-
-            image_path = os.path.join(
-                "/tmp",
-                "medextract_{}.png".format(uuid.uuid4())
-            )
-
-            pix.save(image_path)
-
-            try:
-                command = [
-                    "tesseract",
-                    image_path,
-                    "stdout",
-                    "-l",
-                    "eng",
-                    "--psm",
-                    "6",
-                ]
-
-                result = subprocess.run(
-                    command,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                    timeout=60,
-                )
-
-                if result.returncode != 0:
-                    raise RuntimeError(
-                        "Tesseract OCR failed: " + result.stderr
-                    )
-
-                if result.stdout.strip():
-
-                    pages.append(
-                        "PAGE {}\n{}".format(
-                            page_number + 1,
-                            result.stdout.strip()
-                        )
-                    )
-
-            finally:
-
-                if os.path.exists(image_path):
-                    os.remove(image_path)
-
-    finally:
-        doc.close()
-
-    return "\n\n".join(pages).strip()
-
-
-def should_use_ocr(extracted_text):
-    """Detect PDFs with an empty or incomplete text layer."""
-
-    if not extracted_text or len(extracted_text.strip()) < 200:
-        return True
-
-    report_markers = [
-        "FINDINGS",
-        "IMPRESSION",
-        "CONCLUSION",
-        "RECOMMENDATION",
-        "FOLLOW UP",
-        "FOLLOW-UP",
-    ]
-
-    return not any(
-        marker in extracted_text.upper()
-        for marker in report_markers
-    )
-
 
 # ============================================================
 # TEXT NORMALIZATION
 # ============================================================
+
+
+# Word/Office-generated PDFs often store bullet-list markers as Wingdings /
+# Symbol-font code points sitting in the Unicode Private Use Area. PyMuPDF's
+# text extraction returns those raw code points, and since no normal font
+# maps them to anything, browsers render them as a tofu/empty square ("")
+# instead of a bullet. Map the common ones to a real bullet character.
+_BULLET_GLYPH_MAP = {
+    "\uf0b7": "•", "\uf0a7": "•", "\uf06c": "•", "\uf076": "•",
+    "\uf0d8": "•", "\uf0a8": "•", "\uf0fc": "•", "\uf0ac": "•",
+    "\u25aa": "•", "\u25cf": "•", "\u25e6": "•", "\u2043": "•",
+    "\u2219": "•", "\u25a0": "•", "\u25cb": "•",
+}
+
+# Catch-all for any other Private Use Area code point (U+E000-U+F8FF) that
+# slips through unmapped above - these never render as anything but a
+# square, so fold them to a bullet rather than leave a stray box on screen.
+_PUA_RE = re.compile("[\ue000-\uf8ff]")
+
+
+def _fix_bullet_glyphs(text):
+    for glyph, bullet in _BULLET_GLYPH_MAP.items():
+        text = text.replace(glyph, bullet)
+    return _PUA_RE.sub("•", text)
+
 
 def normalize_text(text):
 
@@ -162,6 +110,8 @@ def normalize_text(text):
 
     text = text.replace("\r", "\n")
     text = text.replace("\x0c", "\n")
+
+    text = _fix_bullet_glyphs(text)
 
     # Normalize multiplication signs
     text = text.replace("×", "x")
@@ -485,9 +435,6 @@ def split_findings(text):
 
     text = remove_footer(text)
 
-    # PDF bullet characters are sometimes copied as private-use glyphs.
-    text = re.sub(r"[•●▪◦·\uf0b7]", "\n", text)
-
     lines = text.split("\n")
 
     findings = []
@@ -541,35 +488,10 @@ def split_findings(text):
 
 def extract_findings(text):
 
-    findings_text = ""
-
-    for heading in [
-        "FINDINGS",
-        "OBSERVATIONS",
-        "OBSERVATION",
-        "DESCRIPTION",
-    ]:
-        findings_text = find_section(text, heading)
-
-        if findings_text:
-            break
-
-    if not findings_text:
-        # Different report systems use descriptive examination headings
-        # instead of the literal word "Findings".
-        body_heading = re.search(
-            r"(?:^|\n)\s*((?:ultrasound|sonography|usg)"
-            r"[^\n]*(?:report|examination|study|neck|thyroid|abdomen|pelvis)?)"
-            r"\s*:?\s*\n",
-            text,
-            re.IGNORECASE,
-        )
-
-        if body_heading:
-            findings_text = find_section(
-                text,
-                body_heading.group(1).strip(),
-            )
+    findings_text = find_section(
+        text,
+        "FINDINGS"
+    )
 
     if not findings_text:
 
@@ -952,6 +874,12 @@ def extract_report_information(text):
         ),
     }
 
+    # If the source report has no explicit Recommendations/Follow-up
+    # section, derive recommendations from the extracted nodule data
+    # using ACR TI-RADS guidelines instead of leaving it empty.
+    if not report["recommendations"]:
+        report["recommendations"] = recommendation_engine.generate_recommendations(report)
+
     return report
 
 
@@ -969,6 +897,7 @@ def index():
     report_data = None
 
     extraction_method = None
+    ocr_confidence = None
 
     if request.method == "POST":
 
@@ -1017,13 +946,13 @@ def index():
                         save_path
                     )
 
-                    if extracted_text.strip() and not should_use_ocr(
-                        extracted_text
-                    ):
+                    if extracted_text.strip():
 
                         extraction_method = (
                             "PDF text extraction"
                         )
+
+                        ocr_confidence = None
 
                         message = (
                             "Report analyzed successfully."
@@ -1032,21 +961,29 @@ def index():
                     else:
 
                         # --------------------------------------
-                        # OCR fallback
+                        # OCR fallback (pytesseract, with image
+                        # preprocessing + PSM fallback + confidence)
                         # --------------------------------------
 
-                        extracted_text = run_ocr_on_pdf(
-                            save_path
+                        extracted_text, ocr_confidence, page_count = (
+                            ocr_engine.run_ocr_on_pdf(save_path)
                         )
 
                         extraction_method = (
                             "Tesseract OCR"
                         )
 
-                        message = (
-                            "Scanned PDF detected. "
-                            "Tesseract OCR was used."
-                        )
+                        if extracted_text.strip():
+                            message = (
+                                "Scanned PDF detected. Tesseract OCR was "
+                                "used across {} page(s) (avg. confidence "
+                                "{}%).".format(page_count, ocr_confidence)
+                            )
+                        else:
+                            message = (
+                                "Scanned PDF detected. Tesseract OCR was "
+                                "attempted but returned no readable text."
+                            )
 
                     # ------------------------------------------
                     # Structure the report
@@ -1060,19 +997,43 @@ def index():
                             )
                         )
 
+                        # --------------------------------------
+                        # Risk analysis + save
+                        # --------------------------------------
+
+                        content_hash = database.compute_content_hash(
+                            extracted_text
+                        )
+
+                        risk_level, risk_flags = (
+                            risk_analyzer.analyze_risk(report_data)
+                        )
+
+                        if ocr_confidence is not None and ocr_confidence < ocr_engine.LOW_CONFIDENCE_THRESHOLD:
+                            risk_flags.append(
+                                "Low OCR confidence ({}%) - please verify extracted "
+                                "text against the original scanned document.".format(ocr_confidence)
+                            )
+                            if risk_level == "LOW":
+                                risk_level = "MEDIUM"
+
+                        database.save_report(
+                            original_name,
+                            report_data,
+                            extracted_text,
+                            extraction_method,
+                            content_hash,
+                            risk_level,
+                            risk_flags,
+                            ocr_confidence,
+                        )
+
                     else:
 
                         error = (
                             "No readable text was found "
-                            "in this report."
+                            "in this report, even after OCR."
                         )
-
-                except subprocess.TimeoutExpired:
-
-                    error = (
-                        "OCR took too long. "
-                        "Please try another PDF."
-                    )
 
                 except Exception as exc:
 
@@ -1089,51 +1050,442 @@ def index():
         report_data=report_data,
 
         extraction_method=extraction_method,
+        ocr_confidence=ocr_confidence,
     )
 
 
-@app.route("/translate", methods=["POST"])
-def translate():
-    payload = request.get_json(silent=True) or {}
-    texts = payload.get("texts")
+# ============================================================
+# SHARED BATCH-UPLOAD PROCESSING
+# ============================================================
 
-    if not isinstance(texts, list) or not all(
-        isinstance(text, str) for text in texts
-    ):
-        return {"error": "Translation requires a list of text values."}, 400
+def process_single_pdf(save_path, original_filename):
+    """
+    Runs the same extraction pipeline as the single-upload route,
+    but returns a result dict instead of rendering a page.
+    Used by /batch-upload for multi-file uploads.
+    """
 
-    if len(texts) > 100 or any(len(text) > 2000 for text in texts):
-        return {"error": "The translation request is too large."}, 413
+    extracted_text = extract_pdf_text(save_path)
+    extraction_method = "PDF text extraction"
+    ocr_confidence = None
 
-    translated = []
+    if not extracted_text.strip():
+        extracted_text, ocr_confidence, _page_count = ocr_engine.run_ocr_on_pdf(save_path)
+        extraction_method = "Tesseract OCR"
 
-    try:
-        for text in texts:
-            query = urlencode({
-                "client": "gtx",
-                "sl": "en",
-                "tl": "ta",
-                "dt": "t",
-                "q": text,
+    if not extracted_text.strip():
+        raise ValueError("No readable text was found in this report, even after OCR.")
+
+    report_data = extract_report_information(extracted_text)
+    content_hash = database.compute_content_hash(extracted_text)
+
+    risk_level, risk_flags = risk_analyzer.analyze_risk(report_data)
+
+    if ocr_confidence is not None and ocr_confidence < ocr_engine.LOW_CONFIDENCE_THRESHOLD:
+        risk_flags.append(
+            "Low OCR confidence ({}%) - please verify extracted "
+            "text against the original scanned document.".format(ocr_confidence)
+        )
+        if risk_level == "LOW":
+            risk_level = "MEDIUM"
+
+    report_id = database.save_report(
+        original_filename,
+        report_data,
+        extracted_text,
+        extraction_method,
+        content_hash,
+        risk_level,
+        risk_flags,
+        ocr_confidence,
+    )
+
+    return {
+        "status": "ok",
+        "report_id": report_id,
+        "filename": original_filename,
+        "risk_level": risk_level,
+        "ocr_confidence": ocr_confidence,
+    }
+
+
+# ============================================================
+# BATCH UPLOAD ROUTE
+# ============================================================
+
+@app.route("/batch-upload", methods=["POST"])
+def batch_upload():
+
+    files = request.files.getlist("reports")
+    results = []
+
+    for file in files:
+
+        if file.filename == "" or not allowed_file(file.filename):
+            results.append({
+                "status": "error",
+                "filename": file.filename,
+                "error": "Invalid file",
             })
-            request_url = "https://translate.googleapis.com/translate_a/single?" + query
-            translation_request = Request(
-                request_url,
-                headers={"User-Agent": "MedExtract/1.0"},
+            continue
+
+        try:
+            original_name = secure_filename(file.filename)
+            unique_name = str(uuid.uuid4()) + "_" + original_name
+            save_path = os.path.join(
+                app.config["UPLOAD_FOLDER"], unique_name
+            )
+            file.save(save_path)
+
+            results.append(
+                process_single_pdf(save_path, original_name)
             )
 
-            with urlopen(translation_request, timeout=10) as response:
-                result = json.loads(response.read().decode("utf-8"))
+        except Exception as exc:
+            results.append({
+                "status": "error",
+                "filename": file.filename,
+                "error": str(exc),
+            })
 
-            translated.append("".join(
-                part[0] for part in result[0] if part and part[0]
-            ))
+    return render_template("batch_results.html", results=results)
+
+
+# ============================================================
+# DASHBOARD / HISTORY / SEARCH
+# ============================================================
+
+@app.route("/dashboard")
+def dashboard():
+
+    query = request.args.get("q", "").strip()
+
+    reports = (
+        database.search_reports(query)
+        if query
+        else database.get_all_reports()
+    )
+
+    return render_template(
+        "dashboard.html", reports=reports, query=query
+    )
+
+
+# ============================================================
+# RECOMMENDATION CLASSIFICATION (FOR COLORED DISPLAY)
+# ============================================================
+
+def classify_recommendations(recommendation_list):
+    """
+    Takes the plain recommendation strings (either extracted from the
+    report text or auto-generated from ACR TI-RADS guidelines) and
+    tags each with an urgency level so the UI can show a colored
+    badge instead of a flat bullet list.
+    """
+    classified = []
+
+    for text in recommendation_list:
+        lower = text.lower()
+
+        if "fna" in lower or "biopsy" in lower:
+            level = "urgent"
+            label = "Biopsy advised"
+        elif "follow-up ultrasound recommended" in lower or "follow up" in lower or "follow-up" in lower:
+            level = "watch"
+            label = "Follow-up advised"
+        elif "no biopsy" in lower or "no immediate action" in lower or "no nodules" in lower or "not required" in lower:
+            level = "clear"
+            label = "No action needed"
+        else:
+            level = "info"
+            label = "Note"
+
+        # Strip the bracketed auto-generated tag for cleaner display;
+        # we show that provenance separately via the badge instead.
+        clean_text = text.replace("[auto-generated from ACR TI-RADS guidelines]", "").strip()
+
+        classified.append({
+            "text": clean_text,
+            "level": level,
+            "label": label,
+        })
+
+    return classified
+
+
+# ============================================================
+# REPORT DETAIL
+# ============================================================
+
+@app.route("/report/<int:report_id>")
+def report_detail(report_id):
+
+    row = database.get_report_by_id(report_id)
+
+    if not row:
+        return "Report not found", 404
+
+    report_data = json.loads(row["report_json"])
+    risk_flags = json.loads(row["risk_flags"] or "[]")
+
+    points = key_points.generate_key_points(
+        report_data, row["risk_level"], risk_flags
+    )
+
+    # Render the diagram SVG inline (more reliable than a separate
+    # <img src="..."> request, which can fail behind some proxies).
+    diagram_svg = thyroid_diagram.build_thyroid_svg(
+        report_data.get("nodules", []),
+        patient_name=row["patient_name"],
+    )
+
+    recommendations = classify_recommendations(
+        report_data.get("recommendations", [])
+    )
+
+    return render_template(
+        "report_detail.html",
+        report=row,
+        report_data=report_data,
+        metadata=report_data.get("metadata", {}),
+        risk_flags=risk_flags,
+        key_points=points,
+        diagram_svg=diagram_svg,
+        recommendations=recommendations,
+    )
+
+
+# ============================================================
+# EXPORT
+# ============================================================
+
+@app.route("/export/<int:report_id>/<fmt>")
+def export_report(report_id, fmt):
+
+    row = database.get_report_by_id(report_id)
+
+    if not row:
+        return "Report not found", 404
+
+    filename_base = "report_{}".format(report_id)
+
+    if fmt == "json":
+        buf = export_utils.export_json(row)
+        return send_file(
+            buf,
+            mimetype="application/json",
+            as_attachment=True,
+            download_name=filename_base + ".json",
+        )
+
+    if fmt == "csv":
+        buf = export_utils.export_csv(row)
+        return send_file(
+            buf,
+            mimetype="text/csv",
+            as_attachment=True,
+            download_name=filename_base + ".csv",
+        )
+
+    if fmt == "pdf":
+        buf = export_utils.export_pdf(row)
+        return send_file(
+            buf,
+            mimetype="application/pdf",
+            as_attachment=True,
+            download_name=filename_base + ".pdf",
+        )
+
+    return "Unsupported format", 400
+
+
+# ============================================================
+# TREND ANALYSIS (PER PATIENT / MRN)
+# ============================================================
+
+@app.route("/trend/<mrn>")
+def trend(mrn):
+
+    reports = database.get_reports_by_mrn(mrn)
+    trend_rows = []
+    previous_largest = None
+
+    for row in reports:
+
+        report_data = json.loads(row["report_json"])
+        nodules = report_data.get("nodules", [])
+
+        sizes = [
+            risk_analyzer._max_dimension_cm(n.get("size", ""))
+            for n in nodules
+        ]
+
+        largest = max(sizes) if sizes else 0
+
+        change = None
+
+        if previous_largest is not None:
+            if largest > previous_largest:
+                change = "up"
+            elif largest < previous_largest:
+                change = "down"
+            else:
+                change = "same"
+
+        trend_rows.append({
+            "id": row["id"],
+            "procedure_date": row["procedure_date"],
+            "risk_level": row["risk_level"],
+            "nodule_count": len(nodules),
+            "largest_nodule_size": (
+                "{} cm".format(largest) if largest else None
+            ),
+            "change": change,
+        })
+
+        previous_largest = largest
+
+    patient_name = reports[0]["patient_name"] if reports else None
+
+    return render_template(
+        "trend.html",
+        mrn=mrn,
+        patient_name=patient_name,
+        reports=reports,
+        trend_rows=trend_rows,
+    )
+
+
+# ============================================================
+# CHATBOT (PER REPORT)
+# ============================================================
+
+@app.route("/chatbot/<int:report_id>", methods=["POST"])
+def chatbot_query(report_id):
+
+    row = database.get_report_by_id(report_id)
+
+    if not row:
+        return jsonify({"answer": "Report not found."}), 404
+
+    question = request.json.get("question", "") if request.json else ""
+
+    report_data = json.loads(row["report_json"])
+    risk_flags = json.loads(row["risk_flags"] or "[]")
+
+    answer = chatbot.answer_question(
+        question, report_data, row["risk_level"], risk_flags
+    )
+
+    return jsonify({"answer": answer})
+
+
+# ============================================================
+# THYROID DIAGRAM (SVG)
+# ============================================================
+
+@app.route("/diagram/<int:report_id>.svg")
+def diagram_svg(report_id):
+
+    row = database.get_report_by_id(report_id)
+
+    if not row:
+        return "Report not found", 404
+
+    report_data = json.loads(row["report_json"])
+    svg = thyroid_diagram.build_thyroid_svg(
+        report_data.get("nodules", []),
+        patient_name=row["patient_name"],
+    )
+
+    return Response(svg, mimetype="image/svg+xml")
+
+
+# ============================================================
+# FOLLOW-UP SCHEDULER (.ics EXPORT)
+# ============================================================
+
+@app.route("/followup/<int:report_id>")
+def followup_info(report_id):
+
+    row = database.get_report_by_id(report_id)
+
+    if not row:
+        return jsonify({"error": "Report not found"}), 404
+
+    plan = followup_scheduler.get_followup_plan(row)
+
+    return jsonify({
+        "needed": plan["needed"],
+        "reason": plan["reason"],
+        "months": plan["months"],
+        "due_date": plan["due_date"].strftime("%Y-%m-%d") if plan["due_date"] else None,
+    })
+
+
+@app.route("/followup/<int:report_id>/ics")
+def followup_ics(report_id):
+
+    row = database.get_report_by_id(report_id)
+
+    if not row:
+        return "Report not found", 404
+
+    ics_bytes = followup_scheduler.generate_ics(row)
+
+    return Response(
+        ics_bytes,
+        mimetype="text/calendar",
+        headers={
+            "Content-Disposition": "attachment; filename=followup_report_{}.ics".format(report_id)
+        },
+    )
+
+
+# ============================================================
+# GLOBAL CHATBOT (ACROSS ALL REPORTS)
+# ============================================================
+
+@app.route("/chat")
+def global_chat_page():
+    return render_template("global_chat.html")
+
+
+@app.route("/diagnostics")
+def diagnostics():
+    """
+    Quick health check for the two most common setup problems:
+    Tesseract OCR not installed, and the Gemini API key missing.
+    Visit /diagnostics in the browser after starting the app.
+    """
+    import ai_client
+
+    return jsonify({
+        "tesseract_ready": ocr_engine.TESSERACT_READY,
+        "tesseract_error": ocr_engine.TESSERACT_ERROR,
+        "tesseract_cmd": pytesseract_cmd_or_none(),
+        "gemini_api_key_set": bool(ai_client.GEMINI_API_KEY),
+        "gemini_model": ai_client.GEMINI_MODEL,
+    })
+
+
+def pytesseract_cmd_or_none():
+    try:
+        import pytesseract
+        return pytesseract.pytesseract.tesseract_cmd
     except Exception:
-        return {
-            "error": "Tamil translation is temporarily unavailable."
-        }, 502
+        return None
 
-    return {"translations": translated}
+
+@app.route("/global-chatbot", methods=["POST"])
+def global_chatbot_query():
+
+    question = request.json.get("question", "") if request.json else ""
+    reports = database.get_all_reports()
+
+    answer = global_chatbot.answer_question(question, reports)
+
+    return jsonify({"answer": answer})
 
 
 # ============================================================
