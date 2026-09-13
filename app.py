@@ -70,6 +70,27 @@ def extract_pdf_text(pdf_path):
     return "\n".join(pages).strip()
 
 
+def should_use_ocr(extracted_text):
+    """Detect PDFs whose text layer is empty or missing report content."""
+
+    if not extracted_text or len(extracted_text.strip()) < 200:
+        return True
+
+    report_markers = [
+        "FINDINGS",
+        "IMPRESSION",
+        "CONCLUSION",
+        "RECOMMENDATION",
+        "FOLLOW UP",
+        "FOLLOW-UP",
+    ]
+
+    return not any(
+        marker in extracted_text.upper()
+        for marker in report_markers
+    )
+
+
 # ============================================================
 # OCR FALLBACK - see ocr_engine.py for the actual pytesseract-based
 # implementation (with preprocessing, PSM fallback, and confidence
@@ -437,6 +458,7 @@ def split_findings(text):
         return []
 
     text = remove_footer(text)
+    text = re.sub(r"[•●▪◦·\uf0b7]", "\n", text)
 
     lines = text.split("\n")
 
@@ -491,10 +513,33 @@ def split_findings(text):
 
 def extract_findings(text):
 
-    findings_text = find_section(
-        text,
-        "FINDINGS"
-    )
+    findings_text = ""
+
+    for heading in [
+        "FINDINGS",
+        "OBSERVATIONS",
+        "OBSERVATION",
+        "DESCRIPTION",
+    ]:
+        findings_text = find_section(text, heading)
+
+        if findings_text:
+            break
+
+    if not findings_text:
+        body_heading = re.search(
+            r"(?:^|\n)\s*((?:ultrasound|sonography|usg)"
+            r"[^\n]*(?:report|examination|study|neck|thyroid|abdomen|pelvis)?)"
+            r"\s*:?\s*\n",
+            text,
+            re.IGNORECASE,
+        )
+
+        if body_heading:
+            findings_text = find_section(
+                text,
+                body_heading.group(1).strip(),
+            )
 
     if not findings_text:
 
@@ -947,7 +992,9 @@ def index():
                         save_path
                     )
 
-                    if extracted_text.strip():
+                    if extracted_text.strip() and not should_use_ocr(
+                        extracted_text
+                    ):
 
                         extraction_method = (
                             "PDF text extraction"
@@ -1070,7 +1117,7 @@ def process_single_pdf(save_path, original_filename):
     extraction_method = "PDF text extraction"
     ocr_confidence = None
 
-    if not extracted_text.strip():
+    if should_use_ocr(extracted_text):
         extracted_text, ocr_confidence, _page_count = ocr_engine.run_ocr_on_pdf(save_path)
         extraction_method = "Tesseract OCR"
 
