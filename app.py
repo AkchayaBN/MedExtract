@@ -2,6 +2,9 @@ import os
 import re
 import json
 import uuid
+from urllib.error import HTTPError
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 import fitz
 from flask import Flask, render_template, request, send_file, jsonify, Response
@@ -740,17 +743,17 @@ def extract_nodules(text):
 
             location = clean_value(
                 match.group(1)
-            ) if match.lastindex >= 3 else ""
+            ) if match.lastindex and match.lastindex >= 3 else ""
 
             size = clean_value(
                 match.group(2)
-                if match.lastindex >= 3
+                if match.lastindex and match.lastindex >= 3
                 else match.group(1)
             )
 
             tirads_number = (
                 match.group(3)
-                if match.lastindex >= 3
+                if match.lastindex and match.lastindex >= 3
                 else match.group(2)
             )
 
@@ -921,9 +924,7 @@ def index():
 
                 try:
 
-                    original_name = secure_filename(
-                        file.filename
-                    )
+                    original_name = secure_filename(file.filename or "")
 
                     unique_name = (
                         str(uuid.uuid4())
@@ -1130,7 +1131,7 @@ def batch_upload():
             continue
 
         try:
-            original_name = secure_filename(file.filename)
+            original_name = secure_filename(file.filename or "")
             unique_name = str(uuid.uuid4()) + "_" + original_name
             save_path = os.path.join(
                 app.config["UPLOAD_FOLDER"], unique_name
@@ -1475,6 +1476,72 @@ def pytesseract_cmd_or_none():
         return pytesseract.pytesseract.tesseract_cmd
     except Exception:
         return None
+
+
+@app.route("/translate", methods=["POST"])
+def translate():
+    payload = request.get_json(silent=True) or {}
+    texts = payload.get("texts")
+
+    if not isinstance(texts, list) or not all(
+        isinstance(text, str) for text in texts
+    ):
+        return {"error": "Translation requires a list of text values."}, 400
+
+    if len(texts) > 100 or any(len(text) > 2000 for text in texts):
+        return {"error": "The translation request is too large."}, 413
+
+    translated = []
+
+    try:
+        for text in texts:
+            try:
+                query = urlencode({
+                    "client": "gtx",
+                    "sl": "en",
+                    "tl": "ta",
+                    "dt": "t",
+                    "q": text,
+                })
+                translation_request = Request(
+                    "https://translate.googleapis.com/translate_a/single?"
+                    + query,
+                    headers={"User-Agent": "MedExtract/1.0"},
+                )
+
+                with urlopen(translation_request, timeout=10) as response:
+                    result = json.loads(response.read().decode("utf-8"))
+
+                translated.append("".join(
+                    part[0] for part in result[0] if part and part[0]
+                ))
+            except HTTPError as exc:
+                if exc.code not in {429, 500, 502, 503, 504}:
+                    raise
+
+                fallback_query = urlencode({
+                    "q": text,
+                    "langpair": "en|ta",
+                })
+                fallback_request = Request(
+                    "https://api.mymemory.translated.net/get?" + fallback_query,
+                    headers={"User-Agent": "MedExtract/1.0"},
+                )
+
+                with urlopen(fallback_request, timeout=10) as response:
+                    fallback_result = json.loads(
+                        response.read().decode("utf-8")
+                    )
+
+                translated.append(
+                    fallback_result["responseData"]["translatedText"]
+                )
+    except Exception:
+        return {
+            "error": "Tamil translation is temporarily unavailable."
+        }, 502
+
+    return {"translations": translated}
 
 
 @app.route("/global-chatbot", methods=["POST"])

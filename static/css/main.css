@@ -527,6 +527,28 @@ tr.clickable-row:hover {
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 }
 
+.translation-toolbar,
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.translation-toolbar {
+  margin-bottom: 18px;
+}
+
+.translate-status {
+  color: var(--text-muted);
+  margin: 0;
+  font-size: 13px;
+}
+
+.section-read-button {
+  white-space: nowrap;
+}
+
 .highlight-box {
   background: var(--accent-tint);
   border-left: 3px solid var(--accent);
