@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedExtract - Report #{{ report.id }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body>
+
+    {% include "_nav.html" %}
+
+    <div class="page-head">
+        <h1>Report #{{ report.id }}</h1>
+        <p><a href="/dashboard">&larr; Back to dashboard</a></p>
+    </div>
+
+    <div class="container container-narrow">
+
+        <div class="card">
+            <h2 class="card-title">Overview</h2>
+
+            <div class="info-grid">
+                <div class="info-item">
+                    <div class="info-label">Patient</div>
+                    <div class="info-value">{{ metadata.patient_name or '—' }}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">MRN</div>
+                    <div class="info-value">
+                        {% if metadata.mrn %}<a href="/trend/{{ metadata.mrn }}">{{ metadata.mrn }}</a>{% else %}—{% endif %}
+                    </div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Age / gender</div>
+                    <div class="info-value">{{ metadata.age_gender or '—' }}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Facility</div>
+                    <div class="info-value">{{ metadata.facility or '—' }}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Procedure date</div>
+                    <div class="info-value">{{ metadata.procedure_date or '—' }}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Risk level</div>
+                    <div class="info-value">
+                        <span class="badge badge-{{ report.risk_level }}{{ ' pulse' if report.risk_level == 'HIGH' else '' }}">{{ report.risk_level }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <p style="font-size:13px; color:var(--ink-muted); margin: 14px 2px 0;">
+                Extraction method: {{ report.extraction_method or '—' }}
+                {% if report.ocr_confidence is not none %}
+                &nbsp;·&nbsp; OCR confidence: {{ report.ocr_confidence }}%
+                {% if report.ocr_confidence < 60 %}<span style="color:var(--risk-high);"> (low - verify manually)</span>{% endif %}
+                {% endif %}
+            </p>
+
+            <div style="margin-top:16px; display:flex; gap:8px; flex-wrap:wrap;">
+                <a class="btn btn-quiet btn-sm" href="/export/{{ report.id }}/pdf">Export PDF</a>
+                <a class="btn btn-quiet btn-sm" href="/export/{{ report.id }}/csv">Export CSV</a>
+                <a class="btn btn-quiet btn-sm" href="/export/{{ report.id }}/json">Export JSON</a>
+                <a class="btn btn-follow btn-sm" href="/followup/{{ report.id }}/ics">Add follow-up to calendar</a>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 class="card-title">
+                <svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z"/></svg>
+                Key points
+            </h2>
+            <ul class="finding-list">
+                {% for point in key_points %}
+                <li>{{ point }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <div class="card">
+            <h2 class="card-title">Thyroid nodule map</h2>
+            <div style="max-width:640px; margin: 0 auto;">
+                {{ diagram_svg | safe }}
+            </div>
+        </div>
+
+        <div class="card" id="followup-card">
+            <h2 class="card-title">Follow-up recommendation</h2>
+            <p id="followup-text" style="color:var(--ink-muted); font-size:14px;">Loading follow-up plan&hellip;</p>
+        </div>
+
+        <script>
+            fetch('/followup/{{ report.id }}')
+                .then(r => r.json())
+                .then(data => {
+                    const el = document.getElementById('followup-text');
+                    if (data.needed) {
+                        el.innerHTML = '<strong style="color:var(--ink);">Follow-up recommended in ' + data.months +
+                            ' month(s)</strong> - suggested date: <span class="data">' + data.due_date +
+                            '</span><br><span style="color:var(--ink-muted); font-size:13px;">' + data.reason + '</span>';
+                    } else {
+                        el.innerHTML = '<span style="color:var(--risk-low); font-weight:600;">No urgent follow-up flagged.</span><br>' +
+                            '<span style="color:var(--ink-muted); font-size:13px;">' + data.reason + '</span>';
+                    }
+                })
+                .catch(() => {
+                    document.getElementById('followup-text').textContent = 'Could not load follow-up plan.';
+                });
+        </script>
+
+        {% if risk_flags %}
+        <div class="card">
+            <h2 class="card-title">Risk / anomaly flags</h2>
+            {% for flag in risk_flags %}
+                <div class="flag">{{ flag }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="card">
+            <h2 class="card-title">Measurements</h2>
+            {% if report_data.measurements %}
+            <div class="table-wrapper">
+                <table>
+                    <tr><th>Name</th><th>Size</th><th>Volume</th></tr>
+                    {% for m in report_data.measurements %}
+                    <tr><td>{{ m.name }}</td><td class="data">{{ m.size or '—' }}</td><td class="data">{{ m.volume or '—' }}</td></tr>
+                    {% endfor %}
+                </table>
+            </div>
+            {% else %}<p class="empty">No measurements extracted.</p>{% endif %}
+        </div>
+
+        <div class="card">
+            <h2 class="card-title">Nodules</h2>
+            {% if report_data.nodules %}
+            <div class="table-wrapper">
+                <table>
+                    <tr><th>Location</th><th>Size</th><th>TI-RADS</th><th>Description</th></tr>
+                    {% for n in report_data.nodules %}
+                    <tr><td>{{ n.location or '—' }}</td><td class="data">{{ n.size or '—' }}</td><td class="data">{{ n.tirads or '—' }}</td><td>{{ n.description }}</td></tr>
+                    {% endfor %}
+                </table>
+            </div>
+            {% else %}<p class="empty">No nodules extracted.</p>{% endif %}
+        </div>
+
+        <div class="card">
+            <h2 class="card-title">Findings</h2>
+            <ul class="finding-list">{% for f in report_data.findings %}<li>{{ f }}</li>{% endfor %}</ul>
+        </div>
+
+        <div class="card">
+            <h2 class="card-title">Impression</h2>
+            {% for i in report_data.impression %}
+            <div class="highlight-box">{{ i }}</div>
+            {% endfor %}
+        </div>
+
+        <div class="card">
+            <h2 class="card-title">Recommendations</h2>
+            {% if recommendations %}
+                {% for rec in recommendations %}
+                <div class="rec rec-{{ rec.level }}">
+                    <span class="rec-badge rec-badge-{{ rec.level }}">{{ rec.label }}</span>
+                    <span class="rec-text">{{ rec.text }}</span>
+                </div>
+                {% endfor %}
+                <p class="rec-note">Recommendations without an explicit source in the original report text are derived from ACR TI-RADS guidelines based on nodule size and category.</p>
+            {% else %}
+                <p class="empty">No recommendations available.</p>
+            {% endif %}
+        </div>
+
+        <div class="card">
+            <h2 class="card-title">
+                <svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"/></svg>
+                Ask about this report
+            </h2>
+            <div id="chat-log" class="chat-log">
+                <div class="chat-empty">Ask things like "what nodules were found?" or "is a biopsy recommended?"</div>
+            </div>
+            <div class="chat-input-row">
+                <input type="text" id="chat-input" placeholder="e.g. What nodules were found?">
+                <button class="btn" onclick="sendChat()">Ask</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const reportId = {{ report.id }};
+        const chatLog = document.getElementById('chat-log');
+        let chatStarted = false;
+
+        function clearEmptyState() {
+            if (!chatStarted) {
+                chatLog.innerHTML = '';
+                chatStarted = true;
+            }
+        }
+
+        function appendMessage(text, isUser) {
+            clearEmptyState();
+            const row = document.createElement('div');
+            row.className = 'chat-row ' + (isUser ? 'chat-row-user' : 'chat-row-bot');
+            const bubble = document.createElement('span');
+            bubble.className = 'chat-bubble';
+            bubble.textContent = text;
+            row.appendChild(bubble);
+            chatLog.appendChild(row);
+            chatLog.scrollTop = chatLog.scrollHeight;
+            return row;
+        }
+
+        function appendTyping() {
+            clearEmptyState();
+            const row = document.createElement('div');
+            row.className = 'chat-row chat-row-bot';
+            row.id = 'typing-indicator';
+            row.innerHTML = '<span class="chat-bubble chat-typing"><span></span><span></span><span></span></span>';
+            chatLog.appendChild(row);
+            chatLog.scrollTop = chatLog.scrollHeight;
+        }
+
+        async function sendChat() {
+            const input = document.getElementById('chat-input');
+            const question = input.value.trim();
+            if (!question) return;
+
+            appendMessage(question, true);
+            input.value = '';
+            appendTyping();
+
+            try {
+                const res = await fetch('/chatbot/' + reportId, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question: question })
+                });
+                const data = await res.json();
+                document.getElementById('typing-indicator')?.remove();
+                appendMessage(data.answer, false);
+            } catch (err) {
+                document.getElementById('typing-indicator')?.remove();
+                appendMessage('Sorry, something went wrong answering that.', false);
+            }
+        }
+
+        document.getElementById('chat-input').addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') sendChat();
+        });
+    </script>
+</body>
+</html>

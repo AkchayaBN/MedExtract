@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedExtract - Batch Upload Results</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body>
+
+    {% include "_nav.html" %}
+
+    <div class="page-head">
+        <h1>Batch upload results</h1>
+        <p><a href="/">&larr; Upload more</a> &nbsp;·&nbsp; <a href="/dashboard">Go to dashboard</a></p>
+    </div>
+
+    <div class="container container-narrow">
+        <div class="card card-flush">
+            {% for r in results %}
+            <div class="batch-row">
+                <div>
+                    <div class="batch-filename">{{ r.filename }}</div>
+                    {% if r.status == 'ok' %}
+                        <span class="status-ok">Processed successfully</span>
+                        <span class="badge badge-{{ r.risk_level }}" style="margin-left:6px;">{{ r.risk_level }}</span>
+                    {% else %}
+                        <span class="status-err">Failed: {{ r.error }}</span>
+                    {% endif %}
+                </div>
+                <div>
+                    {% if r.status == 'ok' %}
+                    <a class="btn btn-sm" href="/report/{{ r.report_id }}">View</a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</body>
+</html>

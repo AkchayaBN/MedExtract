@@ -6,379 +6,17 @@
 
     <title>MedExtract - Medical Report Analysis</title>
 
-    <style>
-        * {
-            box-sizing: border-box;
-        }
-
-        body {
-            margin: 0;
-            font-family: Arial, Helvetica, sans-serif;
-            background: #f4f7fb;
-            color: #26364a;
-        }
-
-        .header {
-            background: #173f73;
-            color: white;
-            padding: 24px 20px;
-            text-align: center;
-        }
-
-        .header h1 {
-            margin: 0;
-            font-size: 30px;
-            font-weight: 700;
-        }
-
-        .header p {
-            margin: 8px 0 0;
-            font-size: 15px;
-            opacity: 0.9;
-        }
-
-        .container {
-            width: 92%;
-            max-width: 1100px;
-            margin: 30px auto;
-        }
-
-        .card {
-            background: white;
-            border-radius: 12px;
-            padding: 22px;
-            margin-bottom: 22px;
-            box-shadow: 0 3px 14px rgba(0, 0, 0, 0.08);
-        }
-
-        .card-title {
-            margin: 0 0 18px;
-            color: #174a83;
-            font-size: 19px;
-        }
-
-        /* Upload */
-
-        .upload-card {
-            text-align: center;
-        }
-
-        .upload-area {
-            border: 2px dashed #9db4cf;
-            border-radius: 10px;
-            padding: 30px 20px;
-            background: #f8fbff;
-        }
-
-        .upload-area input[type="file"] {
-            margin: 15px 0;
-            padding: 10px;
-            width: 100%;
-            max-width: 500px;
-        }
-
-        .analyze-btn {
-            display: inline-block;
-            border: none;
-            background: #174a83;
-            color: white;
-            padding: 12px 28px;
-            border-radius: 6px;
-            font-size: 15px;
-            font-weight: 600;
-            cursor: pointer;
-        }
-
-        .analyze-btn:hover {
-            background: #123b69;
-        }
-
-        /* Messages */
-
-        .success {
-            background: #e9f7ec;
-            color: #246b35;
-            border-radius: 6px;
-            padding: 12px 15px;
-            margin-bottom: 20px;
-        }
-
-        .error {
-            background: #fdecec;
-            color: #9b2929;
-            border-radius: 6px;
-            padding: 12px 15px;
-            margin-bottom: 20px;
-        }
-
-        /* Metadata */
-
-        .info-grid {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 0;
-            border: 1px solid #e1e7ef;
-            border-radius: 8px;
-            overflow: hidden;
-        }
-
-        .info-item {
-            padding: 13px 15px;
-            border-bottom: 1px solid #e1e7ef;
-            background: #fff;
-        }
-
-        .info-item:nth-child(odd) {
-            border-right: 1px solid #e1e7ef;
-        }
-
-        .info-label {
-            font-size: 12px;
-            color: #708198;
-            margin-bottom: 5px;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-
-        .info-value {
-            font-size: 15px;
-            color: #26364a;
-            word-break: break-word;
-        }
-
-        /* Tables */
-
-        .table-wrapper {
-            overflow-x: auto;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        th {
-            text-align: left;
-            background: #edf3f9;
-            color: #315a83;
-            font-size: 13px;
-            padding: 12px;
-        }
-
-        td {
-            padding: 12px;
-            border-bottom: 1px solid #e0e6ee;
-            font-size: 14px;
-        }
-
-        tr:last-child td {
-            border-bottom: none;
-        }
-
-        /* Findings */
-
-        .finding-list {
-            list-style: none;
-            margin: 0;
-            padding: 0;
-        }
-
-        .finding-list li {
-            display: grid;
-            grid-template-columns: 32px minmax(0, 1fr);
-            gap: 12px;
-            align-items: start;
-            margin-bottom: 10px;
-            line-height: 1.55;
-            background: #f7f9fc;
-            padding: 10px 12px;
-            border-radius: 6px;
-        }
-
-        .finding-list li::before {
-            content: counter(findings);
-            counter-increment: findings;
-            display: grid;
-            place-items: center;
-            width: 26px;
-            height: 26px;
-            border-radius: 50%;
-            background: #174a83;
-            color: white;
-            font-size: 12px;
-            font-weight: 700;
-        }
-
-        .finding-list {
-            counter-reset: findings;
-        }
-
-        .section-heading {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-        }
-
-        .translation-toolbar {
-            display: flex;
-            align-items: center;
-            justify-content: flex-end;
-            gap: 12px;
-            margin-bottom: 22px;
-        }
-
-        .translation-actions {
-            display: flex;
-            gap: 8px;
-        }
-
-        .translate-btn {
-            border: 1px solid #174a83;
-            background: white;
-            color: #174a83;
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-        }
-
-        .translate-btn:hover {
-            background: #edf3f9;
-        }
-
-        .translate-status {
-            color: #708198;
-            font-size: 13px;
-            margin: 10px 0 0;
-        }
-
-        /* Impression */
-
-        .highlight-box {
-            background: #f3f7fc;
-            border-left: 4px solid #174a83;
-            padding: 15px 17px;
-            border-radius: 5px;
-            margin-bottom: 10px;
-            line-height: 1.55;
-        }
-
-        /* Empty state */
-
-        .empty {
-            color: #7b899b;
-            font-style: italic;
-        }
-
-        /* Original text */
-
-        details {
-            border: 1px solid #e1e7ef;
-            border-radius: 8px;
-            background: #f8fafc;
-        }
-
-        summary {
-            cursor: pointer;
-            padding: 14px 16px;
-            color: #174a83;
-            font-weight: 600;
-        }
-
-        .raw-text {
-            padding: 18px;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-            font-family: "Courier New", monospace;
-            font-size: 13px;
-            line-height: 1.55;
-            color: #36485d;
-            border-top: 1px solid #e1e7ef;
-            max-height: 600px;
-            overflow-y: auto;
-        }
-
-        /* Footer */
-
-        .footer {
-            text-align: center;
-            padding: 25px 15px;
-            color: #718096;
-            font-size: 13px;
-        }
-
-        /* Loading */
-
-        .loading {
-            display: none;
-            margin-top: 15px;
-            color: #174a83;
-            font-size: 14px;
-        }
-
-        .spinner {
-            display: inline-block;
-            width: 15px;
-            height: 15px;
-            border: 2px solid #c7d5e5;
-            border-top-color: #174a83;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-            vertical-align: middle;
-            margin-right: 7px;
-        }
-
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
-        }
-
-        /* Responsive */
-
-        @media (max-width: 700px) {
-
-            .container {
-                width: 95%;
-                margin-top: 18px;
-            }
-
-            .header h1 {
-                font-size: 24px;
-            }
-
-            .info-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .info-item:nth-child(odd) {
-                border-right: none;
-            }
-
-            .card {
-                padding: 17px;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
 </head>
 
 <body>
 
-    <!-- =====================================================
-         HEADER
-    ====================================================== -->
+    {% include "_nav.html" %}
 
-    <header class="header">
-
-        <h1>MedExtract</h1>
-
-        <p>
-            Medical Report Analysis &amp; Information Extraction System
-        </p>
-
-    </header>
+    <div class="page-head">
+        <h1>Upload a report</h1>
+        <p>Extract structured data from thyroid ultrasound reports - text-native or scanned.</p>
+    </div>
 
 
     <!-- =====================================================
@@ -395,48 +33,67 @@
         <section class="card upload-card">
 
             <h2 class="card-title">
-                Upload Medical Report
+                <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0-12 4 4m-4-4-4 4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+                Single report
             </h2>
 
-            <div class="upload-area">
+            <p class="hint">PDF only. Scanned pages fall back to Tesseract OCR automatically.</p>
 
-                <p>
-                    Upload a thyroid ultrasound medical report in PDF format.
-                </p>
+            <form method="POST" enctype="multipart/form-data" onsubmit="showLoading('loading')" id="single-form">
 
-                <form
-                    method="POST"
-                    enctype="multipart/form-data"
-                    onsubmit="showLoading()"
-                >
+                <label class="dropzone" id="single-dropzone">
+                    <input type="file" name="report" accept=".pdf,application/pdf" required id="single-file">
+                    <svg class="dropzone-icon" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v12m0-12 4 4m-4-4-4 4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+                    <div class="dropzone-label" id="single-dropzone-label"><strong>Click to choose a PDF</strong> or drag it here</div>
+                    <div class="dropzone-sub">1 file · up to ~20MB</div>
+                </label>
 
-                    <input
-                        type="file"
-                        name="report"
-                        accept=".pdf,application/pdf"
-                        required
-                    >
-
-                    <br>
-
-                    <button
-                        type="submit"
-                        class="analyze-btn"
-                    >
-                        Analyze Medical Report
-                    </button>
-
-                    <div
-                        id="loading"
-                        class="loading"
-                    >
+                <div style="text-align:center; margin-top:16px;">
+                    <button type="submit" class="btn">Analyze report</button>
+                    <div id="loading" class="loading">
                         <span class="spinner"></span>
-                        Analyzing report. Please wait...
+                        Analyzing report&hellip;
                     </div>
+                </div>
 
-                </form>
+            </form>
 
-            </div>
+        </section>
+
+
+        <!-- =================================================
+             BATCH UPLOAD
+        ================================================== -->
+
+        <section class="card upload-card">
+
+            <h2 class="card-title">
+                <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                Batch upload
+            </h2>
+
+            <p class="hint">Process several PDFs in one go - each is added to the dashboard.</p>
+
+            <form action="/batch-upload" method="POST" enctype="multipart/form-data" onsubmit="showLoading('batch-loading')" id="batch-form">
+
+                <label class="dropzone" id="batch-dropzone">
+                    <input type="file" name="reports" accept=".pdf,application/pdf" multiple required id="batch-file">
+                    <svg class="dropzone-icon" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                    <div class="dropzone-label" id="batch-dropzone-label"><strong>Click to choose PDFs</strong> or drag them here</div>
+                    <div class="dropzone-sub">multiple files supported</div>
+                </label>
+
+                <div id="batch-file-list" class="file-chip-list"></div>
+
+                <div style="text-align:center; margin-top:16px;">
+                    <button type="submit" class="btn">Process batch</button>
+                    <div id="batch-loading" class="loading">
+                        <span class="spinner"></span>
+                        Processing batch&hellip;
+                    </div>
+                </div>
+
+            </form>
 
         </section>
 
@@ -447,14 +104,18 @@
 
         {% if message %}
 
-        <div class="success">
+        <div class="notice notice-success">
             {{ message }}
 
             {% if extraction_method %}
-                <br>
                 <small>
-                    Extraction method:
-                    <strong>{{ extraction_method }}</strong>
+                    Extraction method: {{ extraction_method }}
+                    {% if ocr_confidence is not none %}
+                        &nbsp;·&nbsp; OCR confidence: {{ ocr_confidence }}%
+                        {% if ocr_confidence < 60 %}
+                            <span style="color:var(--risk-high);">(low - please verify)</span>
+                        {% endif %}
+                    {% endif %}
                 </small>
             {% endif %}
         </div>
@@ -468,7 +129,7 @@
 
         {% if error %}
 
-        <div class="error">
+        <div class="notice notice-error">
             {{ error }}
         </div>
 
@@ -476,20 +137,6 @@
 
 
         {% if report_data %}
-
-        <div class="translation-toolbar">
-            <p id="translate-status" class="translate-status" role="status"></p>
-            <div class="translation-actions">
-                <button
-                    type="button"
-                    class="translate-btn"
-                    id="translate-button"
-                    onclick="translateOutput()"
-                >
-                    Translate to Tamil
-                </button>
-            </div>
-        </div>
 
 
         <!-- =================================================
@@ -773,23 +420,15 @@
 
         <section class="card">
 
-            <div class="section-heading">
-                <h2 class="card-title">Findings</h2>
-                <button
-                    type="button"
-                    class="translate-btn section-read-button"
-                    data-section="findings"
-                    onclick="readTamilAloud(this, 'findings')"
-                >
-                    Read Findings Aloud
-                </button>
-            </div>
+            <h2 class="card-title">
+                Findings
+            </h2>
 
-            <ul id="findings-section" class="finding-list">
+            <ul class="finding-list">
 
                 {% for item in report_data.findings %}
 
-                <li class="translatable" data-original="{{ item }}">
+                <li>
                     {{ item }}
                 </li>
 
@@ -901,27 +540,17 @@
 
         <section class="card">
 
-            <div class="section-heading">
-                <h2 class="card-title">Impression / Conclusion</h2>
-                <button
-                    type="button"
-                    class="translate-btn section-read-button"
-                    data-section="impression"
-                    onclick="readTamilAloud(this, 'impression')"
-                >
-                    Read Impression Aloud
-                </button>
-            </div>
+            <h2 class="card-title">
+                Impression / Conclusion
+            </h2>
 
-            <div id="impression-section">
             {% for item in report_data.impression %}
 
-            <div class="highlight-box translatable" data-original="{{ item }}">
+            <div class="highlight-box">
                 {{ item }}
             </div>
 
             {% endfor %}
-            </div>
 
         </section>
 
@@ -936,23 +565,15 @@
 
         <section class="card">
 
-            <div class="section-heading">
-                <h2 class="card-title">Recommendation / Follow-up</h2>
-                <button
-                    type="button"
-                    class="translate-btn section-read-button"
-                    data-section="recommendations"
-                    onclick="readTamilAloud(this, 'recommendations')"
-                >
-                    Read Follow-up Aloud
-                </button>
-            </div>
+            <h2 class="card-title">
+                Recommendation / Follow-up
+            </h2>
 
-            <ul id="recommendations-section" class="finding-list">
+            <ul class="finding-list">
 
                 {% for item in report_data.recommendations %}
 
-                <li class="translatable" data-original="{{ item }}">
+                <li>
                     {{ item }}
                 </li>
 
@@ -1016,156 +637,65 @@
 
     <script>
 
-        function showLoading() {
-
-            const loading =
-                document.getElementById("loading");
-
+        function showLoading(id) {
+            const loading = document.getElementById(id);
             if (loading) {
-                loading.style.display = "block";
-            }
-
-        }
-
-        async function translateOutput() {
-            const button = document.getElementById("translate-button");
-            const status = document.getElementById("translate-status");
-            const items = Array.from(document.querySelectorAll(".translatable"));
-            const isTamil = button.dataset.language === "ta";
-
-            if (isTamil) {
-                items.forEach((item) => {
-                    item.textContent = item.dataset.original;
-                });
-                button.dataset.language = "en";
-                button.textContent = "Translate to Tamil";
-                status.textContent = "Showing the original English output.";
-                return;
-            }
-
-            button.disabled = true;
-            status.textContent = "Translating output...";
-
-            try {
-                const response = await fetch("{{ url_for('translate') }}", {
-                    method: "POST",
-                    headers: {"Content-Type": "application/json"},
-                    body: JSON.stringify({
-                        texts: items.map((item) => item.dataset.original),
-                    }),
-                });
-                const result = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(result.error || "Translation failed.");
-                }
-
-                items.forEach((item, index) => {
-                    item.textContent = result.translations[index];
-                });
-                button.dataset.language = "ta";
-                button.textContent = "Show English";
-                status.textContent = "Tamil translation shown.";
-            } catch (error) {
-                status.textContent = error.message;
-            } finally {
-                button.disabled = false;
+                loading.style.display = "flex";
             }
         }
 
-        function loadSpeechVoices() {
-            return new Promise((resolve) => {
-                const voices = window.speechSynthesis.getVoices();
+        function setupDropzone(zoneId, inputId, labelId, listId) {
+            const zone = document.getElementById(zoneId);
+            const input = document.getElementById(inputId);
+            const label = document.getElementById(labelId);
+            const list = listId ? document.getElementById(listId) : null;
+            if (!zone || !input) return;
 
-                if (voices.length) {
-                    resolve(voices);
-                    return;
+            function renderFiles() {
+                const files = Array.from(input.files || []);
+                if (!files.length) return;
+
+                if (list) {
+                    list.innerHTML = "";
+                    files.forEach(f => {
+                        const chip = document.createElement("span");
+                        chip.className = "file-chip";
+                        chip.textContent = f.name;
+                        list.appendChild(chip);
+                    });
+                    label.innerHTML = "<strong>" + files.length + " file" +
+                        (files.length > 1 ? "s" : "") + " selected</strong>";
+                } else {
+                    label.innerHTML = "<strong>" + files[0].name + "</strong> selected";
                 }
+            }
 
-                const finish = () => {
-                    window.speechSynthesis.removeEventListener("voiceschanged", finish);
-                    resolve(window.speechSynthesis.getVoices());
-                };
+            input.addEventListener("change", renderFiles);
 
-                window.speechSynthesis.addEventListener("voiceschanged", finish);
-                window.setTimeout(finish, 1500);
+            ["dragenter", "dragover"].forEach(evt => {
+                zone.addEventListener(evt, e => {
+                    e.preventDefault();
+                    zone.classList.add("dragover");
+                });
+            });
+
+            ["dragleave", "drop"].forEach(evt => {
+                zone.addEventListener(evt, e => {
+                    e.preventDefault();
+                    zone.classList.remove("dragover");
+                });
+            });
+
+            zone.addEventListener("drop", e => {
+                if (e.dataTransfer && e.dataTransfer.files.length) {
+                    input.files = e.dataTransfer.files;
+                    renderFiles();
+                }
             });
         }
 
-        async function readTamilAloud(button, sectionName) {
-            const status = document.getElementById("translate-status");
-
-            if (!("speechSynthesis" in window)) {
-                status.textContent = "Text-to-speech is not supported in this browser.";
-                return;
-            }
-
-            if (window.speechSynthesis.speaking) {
-                window.speechSynthesis.cancel();
-                window.activeReadButton = null;
-                button.textContent = "Read " + sectionName + " Aloud";
-                status.textContent = "Reading stopped.";
-                return;
-            }
-
-            const section = document.getElementById(sectionName + "-section");
-            const items = Array.from(section.querySelectorAll(".translatable"));
-            const text = items.map((item) => item.textContent.trim()).filter(Boolean).join(". ");
-
-            if (!text) {
-                status.textContent = "There is no text in this section to read.";
-                return;
-            }
-
-            const isTamil = document.getElementById("translate-button").dataset.language === "ta";
-            const voices = await loadSpeechVoices();
-            const preferredVoice = voices.find((voice) => {
-                const language = voice.lang.toLowerCase().replace("_", "-");
-                return isTamil
-                    ? language.startsWith("ta-") || /tamil/i.test(voice.name)
-                    : language.startsWith("en-");
-            });
-
-            if (isTamil && !preferredVoice) {
-                status.textContent = "Tamil voice is not available in Chrome. Restart Chrome after installing the Tamil speech voice.";
-                return;
-            }
-
-            const chunks = text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [text];
-            let chunkIndex = 0;
-            window.activeReadButton = button;
-
-            const speakNext = () => {
-                if (window.activeReadButton !== button) {
-                    return;
-                }
-
-                if (chunkIndex >= chunks.length) {
-                    button.textContent = "Read " + sectionName + " Aloud";
-                    status.textContent = "Reading finished.";
-                    return;
-                }
-
-                const speech = new SpeechSynthesisUtterance(chunks[chunkIndex++].trim());
-                speech.lang = isTamil ? "ta-IN" : "en-US";
-                speech.rate = isTamil ? 0.85 : 0.95;
-                if (preferredVoice) {
-                    speech.voice = preferredVoice;
-                }
-                speech.onstart = () => {
-                    button.textContent = "Stop Reading";
-                    status.textContent = "Reading " + sectionName + "...";
-                };
-                speech.onend = speakNext;
-                speech.onerror = () => {
-                    button.textContent = "Read " + sectionName + " Aloud";
-                    status.textContent = "Text-to-speech is unavailable in this browser.";
-                };
-                window.speechSynthesis.speak(speech);
-            };
-
-            speakNext();
-        }
+        setupDropzone("single-dropzone", "single-file", "single-dropzone-label", null);
+        setupDropzone("batch-dropzone", "batch-file", "batch-dropzone-label", "batch-file-list");
 
     </script>
 

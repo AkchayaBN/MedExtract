@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedExtract - Ask Across All Reports</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body>
+
+    {% include "_nav.html" %}
+
+    <div class="page-head">
+        <h1>Ask across all reports</h1>
+        <p>Query counts, trends and patterns across your whole report history.</p>
+    </div>
+
+    <div class="container container-narrow">
+        <div class="card">
+            <div id="chat-log" class="chat-log chat-log-lg">
+                <div class="chat-empty">Try one of the questions below, or type your own.</div>
+            </div>
+            <div class="chat-input-row">
+                <input type="text" id="chat-input" placeholder="e.g. how many high risk reports?">
+                <button class="btn" onclick="sendChat()">Ask</button>
+            </div>
+
+            <div class="suggestions">
+                <span class="suggestion-chip" onclick="askSuggestion(this)">how many reports are there?</span>
+                <span class="suggestion-chip" onclick="askSuggestion(this)">how many high risk reports?</span>
+                <span class="suggestion-chip" onclick="askSuggestion(this)">list patients with TR5 nodules</span>
+                <span class="suggestion-chip" onclick="askSuggestion(this)">nodules over 2 cm</span>
+                <span class="suggestion-chip" onclick="askSuggestion(this)">average nodule size</span>
+                <span class="suggestion-chip" onclick="askSuggestion(this)">most recent report</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const chatLog = document.getElementById('chat-log');
+        let chatStarted = false;
+
+        function clearEmptyState() {
+            if (!chatStarted) {
+                chatLog.innerHTML = '';
+                chatStarted = true;
+            }
+        }
+
+        function appendMessage(text, isUser) {
+            clearEmptyState();
+            const row = document.createElement('div');
+            row.className = 'chat-row ' + (isUser ? 'chat-row-user' : 'chat-row-bot');
+            const bubble = document.createElement('span');
+            bubble.className = 'chat-bubble';
+            bubble.textContent = text;
+            row.appendChild(bubble);
+            chatLog.appendChild(row);
+            chatLog.scrollTop = chatLog.scrollHeight;
+        }
+
+        function appendTyping() {
+            clearEmptyState();
+            const row = document.createElement('div');
+            row.className = 'chat-row chat-row-bot';
+            row.id = 'typing-indicator';
+            row.innerHTML = '<span class="chat-bubble chat-typing"><span></span><span></span><span></span></span>';
+            chatLog.appendChild(row);
+            chatLog.scrollTop = chatLog.scrollHeight;
+        }
+
+        async function sendChat() {
+            const input = document.getElementById('chat-input');
+            const question = input.value.trim();
+            if (!question) return;
+
+            appendMessage(question, true);
+            input.value = '';
+            appendTyping();
+
+            try {
+                const res = await fetch('/global-chatbot', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question: question })
+                });
+                const data = await res.json();
+                document.getElementById('typing-indicator')?.remove();
+                appendMessage(data.answer, false);
+            } catch (err) {
+                document.getElementById('typing-indicator')?.remove();
+                appendMessage('Sorry, something went wrong answering that.', false);
+            }
+        }
+
+        function askSuggestion(el) {
+            document.getElementById('chat-input').value = el.textContent;
+            sendChat();
+        }
+
+        document.getElementById('chat-input').addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') sendChat();
+        });
+    </script>
+</body>
+</html>
